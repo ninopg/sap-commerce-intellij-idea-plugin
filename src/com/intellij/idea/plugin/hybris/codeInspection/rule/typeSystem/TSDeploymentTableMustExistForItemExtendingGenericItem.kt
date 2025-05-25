@@ -1,6 +1,6 @@
 /*
  * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -21,11 +21,13 @@ package com.intellij.idea.plugin.hybris.codeInspection.rule.typeSystem
 import com.intellij.idea.plugin.hybris.codeInspection.fix.xml.XmlAddTagQuickFix
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelStateService
 import com.intellij.idea.plugin.hybris.system.type.model.Deployment
 import com.intellij.idea.plugin.hybris.system.type.model.ItemType
 import com.intellij.idea.plugin.hybris.system.type.model.Items
 import com.intellij.idea.plugin.hybris.system.type.model.all
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.util.xml.highlighting.DomElementAnnotationHolder
 import com.intellij.util.xml.highlighting.DomHighlightingHelper
@@ -50,11 +52,11 @@ class TSDeploymentTableMustExistForItemExtendingGenericItem : AbstractTSInspecti
         severity: HighlightSeverity
     ) {
         // skip non-ComposedType
-        if (HybrisConstants.TS_META_VIEW_TYPE.equals(dom.metaType.stringValue, true) || HybrisConstants.TS_META_COMPOSED_TYPE.equals(dom.metaType.stringValue, true)) return
+        if (HybrisConstants.TS_META_VIEW_TYPE.equals(dom.metaType.stringValue, true) || HybrisConstants.TS_COMPOSED_TYPE.equals(dom.metaType.stringValue, true)) return
 
         val itemTypeCode = dom.code.stringValue ?: return
 
-        val metaItem = TSMetaModelAccess.getInstance(project).getMetaModel().getMetaItem(itemTypeCode)
+        val metaItem = project.service<TSMetaModelStateService>().get().getMetaItem(itemTypeCode)
             ?: return
 
         if (StringUtils.isNotBlank(metaItem.deployment?.typeCode)) return

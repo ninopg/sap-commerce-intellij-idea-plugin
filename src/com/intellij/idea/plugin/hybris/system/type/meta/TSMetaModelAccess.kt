@@ -24,23 +24,12 @@ import com.intellij.idea.plugin.hybris.system.type.meta.impl.TSMetaModelNameProv
 import com.intellij.idea.plugin.hybris.system.type.meta.model.*
 import com.intellij.idea.plugin.hybris.system.type.model.EnumType
 import com.intellij.idea.plugin.hybris.system.type.model.ItemType
-import com.intellij.openapi.application.readAction
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.module.ModuleManager
-import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.ModificationTracker
-import com.intellij.platform.ide.progress.withBackgroundProgress
-import com.intellij.platform.util.progress.reportProgress
-import com.intellij.psi.PsiFile
-import com.intellij.psi.util.CachedValue
-import com.intellij.psi.util.CachedValueProvider
-import com.intellij.psi.util.CachedValuesManager
-import com.intellij.util.messages.Topic
 import com.intellij.util.xml.DomElement
-import kotlinx.coroutines.*
 import org.apache.commons.collections4.CollectionUtils
 import java.util.*
 import kotlin.io.path.exists
@@ -59,18 +48,14 @@ import kotlin.io.path.inputStream
  * It is quite important to take into account the possibility of interruption of the process, especially during Inspection and other heavy operations
  */
 @Service(Service.Level.PROJECT)
-class TSMetaModelAccess(private val project: Project, private val coroutineScope: CoroutineScope) {
+class TSMetaModelAccess(private val project: Project) : Disposable {
 
     companion object {
-        val TOPIC = Topic("HYBRIS_TYPE_SYSTEM_LISTENER", TSChangeListener::class.java)
-        private val SINGLE_MODEL_CACHE_KEY = Key.create<CachedValue<TSMetaModel>>("SINGLE_TS_MODEL_CACHE")
-
         @JvmStatic
         fun getInstance(project: Project): TSMetaModelAccess = project.getService(TSMetaModelAccess::class.java)
     }
 
-    private val myGlobalMetaModel = TSGlobalMetaModel()
-    private val myMessageBus = project.messageBus
+    private val metaModelStateService = project.service<TSMetaModelStateService>()
     private val myReservedTypeCodes by lazy {
         ModuleManager.getInstance(project)
             .modules
@@ -92,77 +77,7 @@ class TSMetaModelAccess(private val project: Project, private val coroutineScope
             ?: emptyMap()
     }
 
-    @Volatile
-    private var building: Boolean = false
-
-    @Volatile
-    private var initialized: Boolean = false
-
-    private val myGlobalMetaModelCache = CachedValuesManager.getManager(project).createCachedValue(
-        {
-            val localMetaModels = runBlocking {
-                withBackgroundProgress(project, "Re-building Type System...", true) {
-                    val collectedDependencies = TSMetaModelCollector.getInstance(project).collectDependencies()
-
-                    val localMetaModels = reportProgress(collectedDependencies.size) { progressReporter ->
-                        collectedDependencies
-                            .map {
-                                progressReporter.sizedStep(1, "Processing: ${it.name}...") {
-                                    this.async {
-                                        retrieveSingleMetaModelPerFile(it)
-                                    }
-                                }
-                            }
-                            .awaitAll()
-                            .sortedBy { !it.custom }
-                    }
-
-                    TSMetaModelMerger.merge(myGlobalMetaModel, localMetaModels)
-
-                    localMetaModels
-                }
-            }
-
-            val dependencies = localMetaModels
-                .map { it.virtualFile }
-                .toTypedArray()
-
-            CachedValueProvider.Result.create(myGlobalMetaModel, dependencies.ifEmpty { ModificationTracker.EVER_CHANGED })
-        }, false
-    )
-
-    fun isInitialized() = initialized
-
-    fun initMetaModel() {
-        building = true
-
-        coroutineScope
-            .launch(Dispatchers.IO) {
-                readAction {
-                    myGlobalMetaModelCache.value
-                }
-            }
-            .invokeOnCompletion {
-                building = false
-                initialized = true
-
-                myMessageBus.syncPublisher(TOPIC).typeSystemChanged(myGlobalMetaModel)
-            }
-    }
-
-    fun getMetaModel(): TSGlobalMetaModel {
-        if (building || !initialized || DumbService.isDumb(project)) throw ProcessCanceledException()
-
-        if (myGlobalMetaModelCache.hasUpToDateValue()) {
-            return myGlobalMetaModelCache.value
-        }
-
-        initMetaModel()
-
-        throw ProcessCanceledException()
-    }
-
-    fun <T : TSGlobalMetaClassifier<*>> getAll(metaType: TSMetaType) = getMetaModel().getMetaType<T>(metaType).values
+    fun <T : TSGlobalMetaClassifier<*>> getAll(metaType: TSMetaType) = metaModelStateService.get().getMetaType<T>(metaType).values
     fun getAllOf(vararg metaTypes: TSMetaType): Collection<TSGlobalMetaClassifier<*>> = (metaTypes
         .takeIf { it.isNotEmpty() }
         ?: TSMetaType.entries.toTypedArray()
@@ -182,7 +97,7 @@ class TSMetaModelAccess(private val project: Project, private val coroutineScope
     fun findMetaMapByName(name: String?) = findMetaByName<TSGlobalMetaMap>(TSMetaType.META_MAP, name)
     fun findMetaRelationByName(name: String?) = findMetaByName<TSGlobalMetaRelation>(TSMetaType.META_RELATION, name)
 
-    fun findRelationByName(name: String?) = CollectionUtils.emptyIfNull(getMetaModel().getAllRelations().values())
+    fun findRelationByName(name: String?) = CollectionUtils.emptyIfNull(metaModelStateService.get().getAllRelations().values())
         .mapNotNull { metaRelationElement -> metaRelationElement.owner }
         .filter { ref: TSMetaRelation -> name == ref.name }
 
@@ -194,7 +109,7 @@ class TSMetaModelAccess(private val project: Project, private val coroutineScope
         ?: findMetaAtomicByName(name)
 
     fun getNextAvailableTypeCode(): Int? {
-        val projectTypeCodes = getMetaModel().getDeploymentTypeCodes().keys
+        val projectTypeCodes = metaModelStateService.get().getDeploymentTypeCodes().keys
         val reservedTypesCodes = getReservedTypeCodes().keys
         val keys = projectTypeCodes + reservedTypesCodes
 
@@ -209,18 +124,9 @@ class TSMetaModelAccess(private val project: Project, private val coroutineScope
 
     fun getReservedTypeCodes() = myReservedTypeCodes
 
-    private fun <T : TSGlobalMetaClassifier<*>> findMetaByName(metaType: TSMetaType, name: String?): T? =
-        getMetaModel().getMetaType<T>(metaType)[name]
+    private fun <T : TSGlobalMetaClassifier<*>> findMetaByName(metaType: TSMetaType, name: String?): T? = metaModelStateService.get()
+        .getMetaType<T>(metaType)[name]
 
-    private fun retrieveSingleMetaModelPerFile(psiFile: PsiFile): TSMetaModel = CachedValuesManager.getManager(project).getCachedValue(
-        psiFile, SINGLE_MODEL_CACHE_KEY,
-        {
-            val value = runBlocking {
-                TSMetaModelProcessor.getInstance(project).process(this, psiFile)
-            }
-
-            CachedValueProvider.Result.create(value, psiFile)
-        },
-        false
-    )
+    override fun dispose() {
+    }
 }

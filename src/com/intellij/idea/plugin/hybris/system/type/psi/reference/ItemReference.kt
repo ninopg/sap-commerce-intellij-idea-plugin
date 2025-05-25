@@ -1,6 +1,6 @@
 /*
- * This file is part of "SAP Commerce Developers Toolset" plugin for Intellij IDEA.
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -19,12 +19,16 @@
 package com.intellij.idea.plugin.hybris.system.type.psi.reference
 
 import com.intellij.codeInsight.highlighting.HighlightedReference
+import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.psi.reference.TSReferenceBase
 import com.intellij.idea.plugin.hybris.psi.util.PsiUtils
+import com.intellij.idea.plugin.hybris.system.type.codeInsight.completion.TSCompletionService
 import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
-import com.intellij.idea.plugin.hybris.system.type.meta.model.TSGlobalMetaItem
+import com.intellij.idea.plugin.hybris.system.type.meta.TSModificationTracker
+import com.intellij.idea.plugin.hybris.system.type.meta.model.TSMetaType
 import com.intellij.idea.plugin.hybris.system.type.psi.reference.result.ItemResolveResult
+import com.intellij.openapi.components.service
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
@@ -32,7 +36,7 @@ import com.intellij.psi.PsiPolyVariantReference
 import com.intellij.psi.ResolveResult
 import com.intellij.psi.util.*
 
-class ItemReference(element: PsiElement) : TSReferenceBase<PsiElement>(element), PsiPolyVariantReference, HighlightedReference {
+open class ItemReference(element: PsiElement) : TSReferenceBase<PsiElement>(element), PsiPolyVariantReference, HighlightedReference {
 
     override fun calculateDefaultRangeInElement(): TextRange =
         if (element.textLength == 0) super.calculateDefaultRangeInElement()
@@ -42,27 +46,29 @@ class ItemReference(element: PsiElement) : TSReferenceBase<PsiElement>(element),
         .getParameterizedCachedValue(element, CACHE_KEY, provider, false, this)
         .let { PsiUtils.getValidResults(it) }
 
+    override fun getVariants(): Array<LookupElementBuilder> = TSCompletionService.getInstance(element.project)
+        .getCompletions(TSMetaType.META_ITEM)
+        .toTypedArray()
+
     companion object {
         val CACHE_KEY = Key.create<ParameterizedCachedValue<Array<ResolveResult>, ItemReference>>("HYBRIS_TS_CACHED_REFERENCE")
 
         private val provider = ParameterizedCachedValueProvider<Array<ResolveResult>, ItemReference> { ref ->
-            val metaModelAccess = TSMetaModelAccess.getInstance(ref.project)
+            val project = ref.project
+            val metaModelAccess = TSMetaModelAccess.getInstance(project)
 
             val name = ref.value
-            val result = metaModelAccess.findMetaItemByName(name)
-                ?.let { resolve(it) }
+            val result: Array<ResolveResult> = metaModelAccess.findMetaItemByName(name)
+                ?.declarations
+                ?.map { ItemResolveResult(it) }
+                ?.toTypedArray()
                 ?: emptyArray()
 
             CachedValueProvider.Result.create(
                 result,
-                metaModelAccess.getMetaModel(), PsiModificationTracker.MODIFICATION_COUNT
+                project.service<TSModificationTracker>(), PsiModificationTracker.MODIFICATION_COUNT
             )
         }
-
-        private fun resolve(meta: TSGlobalMetaItem): Array<ResolveResult> = meta.declarations
-            .map { ItemResolveResult(it) }
-            .toTypedArray()
-
     }
 
 }

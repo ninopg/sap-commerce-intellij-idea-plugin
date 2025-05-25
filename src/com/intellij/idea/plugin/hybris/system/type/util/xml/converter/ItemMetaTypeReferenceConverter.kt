@@ -15,17 +15,21 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.intellij.idea.plugin.hybris.system.cockpitng.meta.model
 
-import com.intellij.idea.plugin.hybris.system.cockpitng.model.config.Config
-import com.intellij.openapi.vfs.VirtualFile
+package com.intellij.idea.plugin.hybris.system.type.util.xml.converter
 
-class CngConfigMeta(
-    virtualFile: VirtualFile,
-    myDom: Config,
-    val contexts: List<CngContextMeta>
-) : CngMeta<Config>(virtualFile, myDom) {
+import com.intellij.idea.plugin.hybris.system.type.psi.reference.ItemMetaTypeReference
+import com.intellij.psi.PsiDocCommentOwner
+import com.intellij.psi.PsiElement
+import com.intellij.psi.ResolvingHint
+import com.intellij.util.xml.ConvertContext
+import com.intellij.util.xml.CustomReferenceConverter
+import com.intellij.util.xml.GenericDomValue
 
-    override fun toString() = virtualFile.name
+class ItemMetaTypeReferenceConverter : CustomReferenceConverter<String>, ResolvingHint {
+
+    override fun createReferences(value: GenericDomValue<String>?, element: PsiElement, context: ConvertContext?) = arrayOf(ItemMetaTypeReference(element))
+
+    override fun canResolveTo(elementClass: Class<out PsiElement>) = !PsiDocCommentOwner::class.java.isAssignableFrom(elementClass)
 
 }

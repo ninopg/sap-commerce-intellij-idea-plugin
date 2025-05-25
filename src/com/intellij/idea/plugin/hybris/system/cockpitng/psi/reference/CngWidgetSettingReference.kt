@@ -1,6 +1,6 @@
 /*
  * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -19,8 +19,10 @@
 package com.intellij.idea.plugin.hybris.system.cockpitng.psi.reference
 
 import com.intellij.idea.plugin.hybris.psi.util.PsiUtils
-import com.intellij.idea.plugin.hybris.system.cockpitng.meta.CngMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.cockpitng.meta.CngMetaModelStateService
+import com.intellij.idea.plugin.hybris.system.cockpitng.meta.CngModificationTracker
 import com.intellij.idea.plugin.hybris.system.cockpitng.psi.reference.result.WidgetSettingResolveResult
+import com.intellij.openapi.components.service
 import com.intellij.openapi.util.Key
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiPolyVariantReference
@@ -45,14 +47,13 @@ class CngWidgetSettingReference(element: PsiElement) : PsiReferenceBase.Poly<Psi
             val element = ref.element
             val lookingForName = ref.value
             val project = element.project
-            val metaModel = CngMetaModelAccess.getInstance(project).getMetaModel()
 
             val widgetDefinitionId = element.parentsOfType<XmlTag>()
                 .firstOrNull { it.localName == "widget" }
                 ?.getAttributeValue("widgetDefinitionId")
 
             val result = if (widgetDefinitionId == null) emptyArray()
-            else metaModel.widgetDefinitions[widgetDefinitionId]
+            else project.service<CngMetaModelStateService>().get().widgetDefinitions[widgetDefinitionId]
                 ?.settings
                 ?.get(lookingForName)
                 ?.let { PsiUtils.getValidResults(arrayOf(WidgetSettingResolveResult(it))) }
@@ -60,7 +61,7 @@ class CngWidgetSettingReference(element: PsiElement) : PsiReferenceBase.Poly<Psi
 
             CachedValueProvider.Result.create(
                 result,
-                metaModel, PsiModificationTracker.MODIFICATION_COUNT
+                project.service<CngModificationTracker>(), PsiModificationTracker.MODIFICATION_COUNT
             )
         }
     }

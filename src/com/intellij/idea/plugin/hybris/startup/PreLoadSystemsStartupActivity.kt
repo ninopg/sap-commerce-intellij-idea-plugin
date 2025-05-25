@@ -1,6 +1,6 @@
 /*
  * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -19,10 +19,11 @@ package com.intellij.idea.plugin.hybris.startup
 
 import com.intellij.idea.plugin.hybris.properties.PropertyService
 import com.intellij.idea.plugin.hybris.settings.components.ProjectSettingsComponent
-import com.intellij.idea.plugin.hybris.system.bean.meta.BSMetaModelAccess
-import com.intellij.idea.plugin.hybris.system.cockpitng.meta.CngMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.bean.meta.BSMetaModelStateService
+import com.intellij.idea.plugin.hybris.system.cockpitng.meta.CngMetaModelStateService
 import com.intellij.idea.plugin.hybris.system.spring.SimpleSpringService
-import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelStateService
+import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
@@ -33,9 +34,9 @@ class PreLoadSystemsStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         if (!ProjectSettingsComponent.getInstance(project).isHybrisProject()) return
 
-        refreshSystem(project) { TSMetaModelAccess.getInstance(project).initMetaModel() }
-        refreshSystem(project) { BSMetaModelAccess.getInstance(project).initMetaModel() }
-        refreshSystem(project) { CngMetaModelAccess.getInstance(project).initMetaModel() }
+        refreshSystem(project) { project.service<TSMetaModelStateService>().init() }
+        refreshSystem(project) { project.service<BSMetaModelStateService>().init() }
+        refreshSystem(project) { project.service<CngMetaModelStateService>().init() }
 
         SimpleSpringService.getService(project)
             ?.let { service -> refreshSystem(project) { service.initCache() } }

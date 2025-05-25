@@ -17,52 +17,24 @@
  */
 package com.intellij.idea.plugin.hybris.system.type.meta
 
+import com.intellij.idea.plugin.hybris.system.meta.MetaModelProcessor
 import com.intellij.idea.plugin.hybris.system.type.meta.impl.TSMetaModelBuilder
 import com.intellij.idea.plugin.hybris.system.type.model.Items
-import com.intellij.idea.plugin.hybris.system.type.util.TSUtils
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiFile
-import com.intellij.psi.xml.XmlFile
-import com.intellij.util.xml.DomManager
-import kotlinx.coroutines.*
 
 @Service(Service.Level.PROJECT)
-class TSMetaModelProcessor(myProject: Project) {
+class TSMetaModelProcessor(project: Project) : MetaModelProcessor<Items, TSMetaModel>(project) {
 
-    private val myDomManager: DomManager = DomManager.getDomManager(myProject)
-
-    suspend fun process(coroutineScope: CoroutineScope, psiFile: PsiFile): TSMetaModel? = coroutineScope {
-        psiFile.virtualFile ?: return@coroutineScope null
-        val module = TSUtils.getModuleForFile(psiFile)
-            ?: return@coroutineScope null
-        val custom = TSUtils.isCustomExtensionFile(psiFile)
-        val rootWrapper = myDomManager.getFileElement(psiFile as XmlFile, Items::class.java)
-
-        rootWrapper ?: return@coroutineScope null
-
-        val items = rootWrapper.rootElement
-
-        val builder = TSMetaModelBuilder(module, psiFile, custom)
-
-        val operations = listOf(
-            coroutineScope.async { builder.withItemTypes(items.itemTypes.itemTypes) },
-            coroutineScope.async { builder.withItemTypes(items.itemTypes.typeGroups.flatMap { it.itemTypes }) },
-            coroutineScope.async { builder.withEnumTypes(items.enumTypes.enumTypes) },
-            coroutineScope.async { builder.withAtomicTypes(items.atomicTypes.atomicTypes) },
-            coroutineScope.async { builder.withCollectionTypes(items.collectionTypes.collectionTypes) },
-            coroutineScope.async { builder.withRelationTypes(items.relations.relations) },
-            coroutineScope.async { builder.withMapTypes(items.mapTypes.mapTypes) },
-        )
-
-        withContext(Dispatchers.IO) {
-            operations.awaitAll()
+    override fun process(container: String, yContainer: String, fileName: String, custom: Boolean, dom: Items): TSMetaModel =
+        with(TSMetaModelBuilder(container, yContainer, fileName, custom)) {
+            withItemTypes(dom.itemTypes.itemTypes)
+            withItemTypes(dom.itemTypes.typeGroups.flatMap { it.itemTypes })
+            withEnumTypes(dom.enumTypes.enumTypes)
+            withAtomicTypes(dom.atomicTypes.atomicTypes)
+            withCollectionTypes(dom.collectionTypes.collectionTypes)
+            withRelationTypes(dom.relations.relations)
+            withMapTypes(dom.mapTypes.mapTypes)
+            build()
         }
-
-        builder.build()
-    }
-
-    companion object {
-        fun getInstance(project: Project): TSMetaModelProcessor = project.getService(TSMetaModelProcessor::class.java)
-    }
 }

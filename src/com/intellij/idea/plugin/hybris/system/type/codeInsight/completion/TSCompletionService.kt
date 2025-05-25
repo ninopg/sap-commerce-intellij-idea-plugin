@@ -29,6 +29,7 @@ import com.intellij.idea.plugin.hybris.impex.psi.ImpexParameter
 import com.intellij.idea.plugin.hybris.properties.PropertyService
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.system.type.codeInsight.lookup.TSLookupElementFactory
+import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaHelper
 import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
 import com.intellij.idea.plugin.hybris.system.type.meta.model.*
 import com.intellij.idea.plugin.hybris.system.type.meta.model.TSGlobalMetaItem.TSGlobalMetaItemAttribute
@@ -85,6 +86,15 @@ class TSCompletionService(private val project: Project) {
 
     fun getCompletions(meta: TSGlobalMetaEnum) = meta.values.values
         .map { TSLookupElementFactory.build(it) }
+
+    fun getItemMetaTypeCompletions() = getMetaTypeCompletions { TSMetaHelper.isItemMetaType(it) }
+    fun getItemAttributeMetaTypeCompletions() = getMetaTypeCompletions { TSMetaHelper.isItemAttributeMetaType(it) }
+    fun getRelationElementMetaTypeCompletions() = getMetaTypeCompletions { TSMetaHelper.isRelationElementMetaType(it) }
+
+    private fun getMetaTypeCompletions(filterByMetaType: (TSGlobalMetaItem) -> Boolean) = TSMetaModelAccess.getInstance(project)
+        .getAll<TSGlobalMetaItem>(TSMetaType.META_ITEM)
+        .filter(filterByMetaType)
+        .mapNotNull { TSLookupElementFactory.build(it) }
 
     fun getImpExInlineTypeCompletions(project: Project, element: ImpexParameter): List<LookupElement> {
         val completion = DeveloperSettingsComponent.getInstance(project).state.impexSettings.completion

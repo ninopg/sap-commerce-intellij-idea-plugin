@@ -24,103 +24,18 @@ import com.intellij.idea.plugin.hybris.system.bean.meta.model.BSGlobalMetaEnum
 import com.intellij.idea.plugin.hybris.system.bean.meta.model.BSMetaType
 import com.intellij.idea.plugin.hybris.system.bean.model.Bean
 import com.intellij.idea.plugin.hybris.system.bean.model.Enum
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.ModificationTracker
-import com.intellij.platform.ide.progress.withBackgroundProgress
-import com.intellij.platform.util.progress.reportProgress
-import com.intellij.psi.PsiFile
-import com.intellij.psi.util.CachedValue
-import com.intellij.psi.util.CachedValueProvider
-import com.intellij.psi.util.CachedValuesManager
-import com.intellij.util.messages.Topic
-import kotlinx.coroutines.*
 
 @Service(Service.Level.PROJECT)
-class BSMetaModelAccess(private val project: Project, private val coroutineScope: CoroutineScope) {
+class BSMetaModelAccess(project: Project) {
 
     companion object {
-        private val SINGLE_MODEL_CACHE_KEY = Key.create<CachedValue<BSMetaModel>>("SINGLE_BEAN_SYSTEM_MODEL_CACHE")
-        val TOPIC = Topic("HYBRIS_BEANS_LISTENER", BSChangeListener::class.java)
-
         fun getInstance(project: Project): BSMetaModelAccess = project.getService(BSMetaModelAccess::class.java)
     }
 
-    private val myGlobalMetaModel = BSGlobalMetaModel()
-    private val myMessageBus = project.messageBus
-
-    @Volatile
-    private var building: Boolean = false
-
-    @Volatile
-    private var initialized: Boolean = false
-
-    private val myGlobalMetaModelCache = CachedValuesManager.getManager(project).createCachedValue(
-        {
-            val localMetaModels = runBlocking {
-                withBackgroundProgress(project, "Re-building Bean System...", true) {
-                    val collectedDependencies = BSMetaModelCollector.getInstance(project).collectDependencies()
-
-                    val localMetaModels = reportProgress(collectedDependencies.size) { progressReporter ->
-                        collectedDependencies
-                            .map {
-                                progressReporter.sizedStep(1, "Processing: ${it.name}...") {
-                                    this.async {
-                                        retrieveSingleMetaModelPerFile(it)
-                                    }
-                                }
-                            }
-                            .awaitAll()
-                            .sortedBy { !it.custom }
-                    }
-
-                    BSMetaModelMerger.merge(myGlobalMetaModel, localMetaModels)
-
-                    localMetaModels
-                }
-            }
-            val dependencies = localMetaModels
-                .map { it.virtualFile }
-                .toTypedArray()
-
-            CachedValueProvider.Result.create(myGlobalMetaModel, dependencies.ifEmpty { ModificationTracker.EVER_CHANGED })
-        }, false
-    )
-
-    fun isInitialized() = initialized
-
-    fun initMetaModel() {
-        building = true
-
-        coroutineScope
-            .launch(Dispatchers.IO) {
-                readAction {
-                    myGlobalMetaModelCache.value
-                }
-            }
-            .invokeOnCompletion {
-                building = false
-                initialized = true
-
-                myMessageBus.syncPublisher(TOPIC).beanSystemChanged(myGlobalMetaModel)
-            }
-    }
-
-    fun getMetaModel(): BSGlobalMetaModel {
-        if (building || !initialized || DumbService.isDumb(project)) throw ProcessCanceledException()
-
-        if (myGlobalMetaModelCache.hasUpToDateValue()) {
-            return myGlobalMetaModelCache.value
-        }
-
-        initMetaModel()
-
-        throw ProcessCanceledException()
-    }
+    private val metaModelStateService = project.service<BSMetaModelStateService>()
 
     fun getAllBeans() = getAll<BSGlobalMetaBean>(BSMetaType.META_BEAN) +
         getAll(BSMetaType.META_WS_BEAN) +
@@ -128,7 +43,7 @@ class BSMetaModelAccess(private val project: Project, private val coroutineScope
 
     fun getAllEnums() = getAll<BSGlobalMetaEnum>(BSMetaType.META_ENUM)
 
-    fun <T : BSGlobalMetaClassifier<*>> getAll(metaType: BSMetaType): Collection<T> = getMetaModel().getMetaType<T>(metaType).values
+    fun <T : BSGlobalMetaClassifier<*>> getAll(metaType: BSMetaType): Collection<T> = metaModelStateService.get().getMetaType<T>(metaType).values
 
     fun findMetaForDom(dom: Enum) = findMetaEnumByName(BSMetaModelNameProvider.extract(dom))
     fun findMetasForDom(dom: Bean): List<BSGlobalMetaBean> = BSMetaModelNameProvider.extract(dom)
@@ -158,18 +73,7 @@ class BSMetaModelAccess(private val project: Project, private val coroutineScope
 
     fun findMetaEnumByName(name: String?) = findMetaByName<BSGlobalMetaEnum>(BSMetaType.META_ENUM, name)
 
-    private fun <T : BSGlobalMetaClassifier<*>> findMetaByName(metaType: BSMetaType, name: String?): T? =
-        getMetaModel().getMetaType<T>(metaType)[name]
+    private fun <T : BSGlobalMetaClassifier<*>> findMetaByName(metaType: BSMetaType, name: String?): T? = metaModelStateService.get()
+        .getMetaType<T>(metaType)[name]
 
-    private fun retrieveSingleMetaModelPerFile(psiFile: PsiFile): BSMetaModel = CachedValuesManager.getManager(project).getCachedValue(
-        psiFile, SINGLE_MODEL_CACHE_KEY,
-        {
-            val value = runBlocking {
-                BSMetaModelProcessor.getInstance(project).process(this, psiFile)
-            }
-
-            CachedValueProvider.Result.create(value, psiFile)
-        },
-        false
-    )
 }

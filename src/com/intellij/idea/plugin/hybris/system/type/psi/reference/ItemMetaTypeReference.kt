@@ -1,6 +1,6 @@
 /*
- * This file is part of "SAP Commerce Developers Toolset" plugin for Intellij IDEA.
- * Copyright (C) 2023 EPAM Systems <hybrisideaplugin@epam.com>
+ * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -15,17 +15,17 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.intellij.idea.plugin.hybris.system.cockpitng.meta
 
-import com.intellij.openapi.project.Project
+package com.intellij.idea.plugin.hybris.system.type.psi.reference
 
-interface CngMetaModelAccess {
+import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.idea.plugin.hybris.system.type.codeInsight.completion.TSCompletionService
+import com.intellij.psi.PsiElement
 
-    companion object {
-        fun getInstance(project: Project): CngMetaModelAccess = project.getService(CngMetaModelAccess::class.java)
-    }
+class ItemMetaTypeReference(element: PsiElement) : ItemReference(element) {
 
-    fun initMetaModel()
-    fun getMetaModel(): CngGlobalMetaModel
+    override fun getVariants(): Array<LookupElementBuilder> = TSCompletionService.getInstance(element.project)
+        .getItemMetaTypeCompletions()
+        .toTypedArray()
 
 }

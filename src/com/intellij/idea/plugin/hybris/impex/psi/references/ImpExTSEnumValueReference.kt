@@ -24,7 +24,9 @@ import com.intellij.idea.plugin.hybris.psi.reference.TSReferenceBase
 import com.intellij.idea.plugin.hybris.psi.util.PsiUtils
 import com.intellij.idea.plugin.hybris.system.type.codeInsight.completion.TSCompletionService
 import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.type.meta.TSModificationTracker
 import com.intellij.idea.plugin.hybris.system.type.psi.reference.result.EnumValueResolveResult
+import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
@@ -33,13 +35,13 @@ import com.intellij.psi.ResolveResult
 import com.intellij.psi.util.*
 import com.intellij.util.asSafely
 
-class ImpExTSDynamicEnumValueReference(owner: PsiElement, metaName: String) : AbstractImpExTSEnumValueReference(owner, metaName)
-class ImpExTSStaticEnumValueReference(owner: PsiElement, metaName: String) : AbstractImpExTSEnumValueReference(owner, metaName)
+class ImpExTSDynamicEnumValueReference(owner: ImpexValue, index: Int, metaName: String) : ImpExTSEnumValueReference(owner, index, metaName)
+class ImpExTSStaticEnumValueReference(owner: ImpexValue, index: Int, metaName: String) : ImpExTSEnumValueReference(owner, index, metaName)
 
-abstract class AbstractImpExTSEnumValueReference(owner: PsiElement, private val metaName: String) : TSReferenceBase<PsiElement>(owner), HighlightedReference {
+abstract class ImpExTSEnumValueReference(private val owner: ImpexValue, private val index: Int, private val metaName: String) : TSReferenceBase<PsiElement>(owner), HighlightedReference {
 
-    fun getTargetElement(): ImpexValue? = element.children.firstOrNull()
-        ?.asSafely<ImpexValue>()
+    fun getTargetElement(): PsiElement? = owner.getFieldValue(index)
+        ?.asSafely<PsiElement>()
 
     override fun calculateDefaultRangeInElement(): TextRange = getTargetElement()
         ?.let { TextRange.from(it.startOffset - element.startOffset, it.textLength) }
@@ -63,10 +65,11 @@ abstract class AbstractImpExTSEnumValueReference(owner: PsiElement, private val 
     companion object {
 
         @JvmStatic
-        val CACHE_KEY = Key.create<ParameterizedCachedValue<Array<ResolveResult>, AbstractImpExTSEnumValueReference>>("HYBRIS_TS_CACHED_REFERENCE")
-        private val provider = ParameterizedCachedValueProvider<Array<ResolveResult>, AbstractImpExTSEnumValueReference> { ref ->
+        val CACHE_KEY = Key.create<ParameterizedCachedValue<Array<ResolveResult>, ImpExTSEnumValueReference>>("HYBRIS_TS_CACHED_REFERENCE")
+        private val provider = ParameterizedCachedValueProvider<Array<ResolveResult>, ImpExTSEnumValueReference> { ref ->
             val lookingForName = ref.value
-            val metaService = TSMetaModelAccess.getInstance(ref.project)
+            val project = ref.project
+            val metaService = TSMetaModelAccess.getInstance(project)
 
             val result: Array<ResolveResult> = metaService.findMetaEnumByName(ref.metaName)
                 ?.values[lookingForName]
@@ -75,8 +78,7 @@ abstract class AbstractImpExTSEnumValueReference(owner: PsiElement, private val 
 
             CachedValueProvider.Result.create(
                 result,
-                PsiModificationTracker.MODIFICATION_COUNT,
-                metaService.getMetaModel()
+                project.service<TSModificationTracker>(), PsiModificationTracker.MODIFICATION_COUNT,
             )
         }
     }

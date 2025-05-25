@@ -1,3 +1,42 @@
+## [2025.1.3]
+
+### `Project Import` enhancements
+- Ensure that `[y] Remote debug` Run Configuration selected after first project import [#1355](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1355)
+- Register various XSD Backoffice schemas during project import/refresh [#1359](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1359)
+
+### `Meta System` enhancements
+- TS & BS Meta Model 2.0 re-implemented using `StateFlow` [#1354](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1354)
+- Respect Meta declarations within Libraries (not Module-aware) [#1358](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1358)
+
+### `Type System` enhancements
+- Added multi-resolve for `extends` for Item Types [#1343](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1343)
+- Added multi-resolve for `type` for Relation Types [#1344](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1344)
+- Added support of the `metatype` for Item Types [#1345](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1345)
+- Added support of the `metatype` for Relation Elements [#1347](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1347)
+- Addressed deadlock for circular extends of two Item Types [#1348](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1348)
+- Reworked caching mechanism for Global TS Meta Model [#1351](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1351)
+
+### `Bean System` enhancements
+- Reworked caching mechanism for Global BS Meta Model [#1353](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1353)
+
+### `Cockpit NG` enhancements
+- Incorporated Global Cockpit NG Meta Model into new Meta evaluation approach [#1356](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1356)
+- Added reference resolution & code contribution for various `i18n` attributes [#1357](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1357)
+
+### `items.xml` inspection rules
+- Item Type `metatype` must be a type extending ComposedType [#1346](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1346)
+- Relation Element `metatype` must be a type extending RelationDescriptor [#1349](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1349)
+- Ensure that inspection rules are using latest TypeSystem [#1352](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1352)
+
+### `ImpEx` enhancements
+- Enhanced Enum values reference resolution within Enum column [#1360](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1360)
+
+### `Terminal` integration
+- Added support of the `Terminal` plugin and set default directory to the project root for new Terminal Windows [#1342](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1342)
+
+### Fixes
+- Do not populate Tomcat JVM Properties for pure Unit Tests [#1350](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1350)
+
 ## [2025.1.2]
 
 ### `Project Import` enhancements

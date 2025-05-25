@@ -1,6 +1,6 @@
 /*
- * This file is part of "SAP Commerce Developers Toolset" plugin for Intellij IDEA.
- * Copyright (C) 2019 EPAM Systems <hybrisideaplugin@epam.com>
+ * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -19,17 +19,20 @@
 package com.intellij.idea.plugin.hybris.codeInspection.rule.typeSystem
 
 import com.intellij.idea.plugin.hybris.common.utils.HybrisI18NBundleUtils
-import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaHelper
-import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelAccess
+import com.intellij.idea.plugin.hybris.system.type.meta.TSMetaModelStateService
+import com.intellij.idea.plugin.hybris.system.type.meta.model.TSGlobalMetaItem
 import com.intellij.idea.plugin.hybris.system.type.model.Items
-import com.intellij.idea.plugin.hybris.system.type.model.all
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.util.xml.GenericAttributeValue
 import com.intellij.util.xml.highlighting.DomElementAnnotationHolder
 import com.intellij.util.xml.highlighting.DomHighlightingHelper
 
-class TSMetaTypeNameMustPointToValidMetaType : AbstractTSInspection() {
+abstract class AbstractTSMetaTypeInspection(private val messageKey: String) : AbstractTSInspection() {
+
+    protected abstract fun collectMetaTypes(dom: Items): Collection<GenericAttributeValue<String>>
+    protected abstract fun isValidMetaType(meta: TSGlobalMetaItem): Boolean
 
     override fun inspect(
         project: Project,
@@ -38,12 +41,7 @@ class TSMetaTypeNameMustPointToValidMetaType : AbstractTSInspection() {
         helper: DomHighlightingHelper,
         severity: HighlightSeverity
     ) {
-        val attributeMetaTypes = dom.itemTypes.all
-            .flatMap { it.attributes.attributes }
-            .map { it.metaType }
-
-        (attributeMetaTypes)
-            .forEach { check(it, holder, severity, project) }
+        collectMetaTypes(dom).forEach { check(it, holder, severity, project) }
     }
 
     private fun check(
@@ -52,18 +50,16 @@ class TSMetaTypeNameMustPointToValidMetaType : AbstractTSInspection() {
         severity: HighlightSeverity,
         project: Project
     ) {
-        val typeCode = dom.stringValue ?: return
+        val name = dom.stringValue ?: return
+        project.service<TSMetaModelStateService>().get()
+            .getMetaItem(name)
+            ?.takeUnless { isValidMetaType(it) }
+            ?: return
 
-        val metaModel = TSMetaModelAccess.getInstance(project).getMetaModel()
-
-        val meta = metaModel.getMetaItem(typeCode)
-
-        if (meta == null || !TSMetaHelper.isAttributeDescriptor(meta)) {
-            holder.createProblem(
-                dom,
-                severity,
-                HybrisI18NBundleUtils.message("hybris.inspections.ts.MetaTypeNameMustPointToValidMetaType.details.key", typeCode)
-            )
-        }
+        holder.createProblem(
+            dom,
+            severity,
+            HybrisI18NBundleUtils.message(messageKey, name)
+        )
     }
 }

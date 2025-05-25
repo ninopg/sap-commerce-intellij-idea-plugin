@@ -1,6 +1,6 @@
 /*
- * This file is part of "SAP Commerce Developers Toolset" plugin for Intellij IDEA.
- * Copyright (C) 2019-2023 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -21,7 +21,7 @@ package com.intellij.idea.plugin.hybris.system.type.meta
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.system.type.meta.model.*
 import com.intellij.idea.plugin.hybris.system.type.model.*
-import java.util.*
+import kotlinx.collections.immutable.toImmutableSet
 
 object TSMetaHelper {
 
@@ -102,13 +102,13 @@ object TSMetaHelper {
 
     fun getAllExtends(metaModel: TSGlobalMetaModel, itemName: String?, extendsName: String?): Set<TSGlobalMetaItem> {
         val tempParents = LinkedHashSet<TSGlobalMetaItem>()
-        var metaItem = getExtendsMetaItem(metaModel, itemName, extendsName)
+        var metaItem = getExtendsMetaItem(metaModel, tempParents, itemName, extendsName)
 
         while (metaItem != null) {
             tempParents.add(metaItem)
-            metaItem = getExtendsMetaItem(metaModel, metaItem.name, metaItem.extendedMetaItemName)
+            metaItem = getExtendsMetaItem(metaModel, tempParents, metaItem.name, metaItem.extendedMetaItemName)
         }
-        return Collections.unmodifiableSet(tempParents)
+        return tempParents.toImmutableSet()
     }
 
     fun getAllRelationEnds(
@@ -121,8 +121,9 @@ object TSMetaHelper {
         return currentMetaRelationEnds + extendsMetaRelationEnds
     }
 
-    fun isAttributeDescriptor(it: TSGlobalMetaItem) = (HybrisConstants.TS_META_TYPE_ATTRIBUTE_DESCRIPTOR == it.name
-        || it.allExtends.any { extends -> HybrisConstants.TS_META_TYPE_ATTRIBUTE_DESCRIPTOR == extends.name })
+    fun isItemAttributeMetaType(meta: TSGlobalMetaItem) = isMetaType(meta, HybrisConstants.TS_TYPE_ATTRIBUTE_DESCRIPTOR)
+    fun isItemMetaType(meta: TSGlobalMetaItem) = isMetaType(meta, HybrisConstants.TS_COMPOSED_TYPE)
+    fun isRelationElementMetaType(meta: TSGlobalMetaItem) = isMetaType(meta, HybrisConstants.TS_TYPE_RELATION_DESCRIPTOR)
 
     fun getAttributeHandler(itemTypeDom: ItemType, attributeDom: Attribute, persistence: Persistence): String? {
         if (persistence.type.value != PersistenceType.DYNAMIC) return null
@@ -139,17 +140,23 @@ object TSMetaHelper {
     // Magic starts here, see official documentation: https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/aa417173fe4a4ba5a473c93eb730a417/8bb46096866910149208fae7c4ec7596.html?locale=en-US
     fun getAttributeHandlerId(typeCode: String, attributeQualifier: String) = typeCode + "_" + attributeQualifier + "AttributeHandler"
 
-    private fun getExtendsMetaItem(metaModel: TSGlobalMetaModel, itemName: String?, extendsName: String?): TSGlobalMetaItem? {
-        val realExtendedMetaItemName = extendsName
-            // prevent deadlock when the type extends itself
-            ?.takeIf { it != itemName }
-            ?: HybrisConstants.TS_TYPE_GENERIC_ITEM
+    private fun getExtendsMetaItem(metaModel: TSGlobalMetaModel, extends: Set<TSGlobalMetaItem>, itemName: String?, extendsName: String?): TSGlobalMetaItem? {
+        // prevent deadlock when the type extends itself
+        if (extendsName == itemName) throw TSMetaModelException("Item cannot extend itself")
 
-        return metaModel.getMetaType<TSGlobalMetaItem>(TSMetaType.META_ITEM)[realExtendedMetaItemName]
+        // fallback should work well because Item uses "" for extends
+        val extendsMeta = metaModel.getMetaType<TSGlobalMetaItem>(TSMetaType.META_ITEM)[extendsName ?: HybrisConstants.TS_TYPE_GENERIC_ITEM]
+
+        if (extends.contains(extendsMeta)) throw TSMetaModelException("Circular extension is not allowed")
+
+        return extendsMeta
     }
 
     private fun getMetaRelationEnds(metaModel: TSGlobalMetaModel, meta: TSGlobalMetaItem): Collection<TSMetaRelation.TSMetaRelationElement> {
         val name = meta.name ?: return emptyList()
         return metaModel.getRelations(name) ?: emptyList()
     }
+
+    private fun isMetaType(meta: TSGlobalMetaItem, type: String) = (type == meta.name
+        || meta.allExtends.any { extends -> type == extends.name })
 }

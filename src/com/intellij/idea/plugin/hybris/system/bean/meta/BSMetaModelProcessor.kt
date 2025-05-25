@@ -17,46 +17,20 @@
  */
 package com.intellij.idea.plugin.hybris.system.bean.meta
 
-import com.intellij.idea.plugin.hybris.system.bean.BSUtils
 import com.intellij.idea.plugin.hybris.system.bean.meta.impl.BSMetaModelBuilder
 import com.intellij.idea.plugin.hybris.system.bean.model.Beans
+import com.intellij.idea.plugin.hybris.system.meta.MetaModelProcessor
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiFile
-import com.intellij.psi.xml.XmlFile
-import com.intellij.util.xml.DomManager
-import kotlinx.coroutines.*
 
 @Service(Service.Level.PROJECT)
-class BSMetaModelProcessor(myProject: Project) {
+class BSMetaModelProcessor(project: Project) : MetaModelProcessor<Beans, BSMetaModel>(project) {
 
-    companion object {
-        fun getInstance(project: Project): BSMetaModelProcessor = project.getService(BSMetaModelProcessor::class.java)
-    }
-
-    private val myDomManager: DomManager = DomManager.getDomManager(myProject)
-
-    suspend fun process(coroutineScope: CoroutineScope, psiFile: PsiFile): BSMetaModel? = coroutineScope {
-        psiFile.virtualFile ?: return@coroutineScope null
-        val module = BSUtils.getModuleForFile(psiFile)
-            ?: return@coroutineScope null
-        val custom = BSUtils.isCustomExtensionFile(psiFile)
-        val root = myDomManager.getFileElement(psiFile as XmlFile, Beans::class.java)
-            ?.rootElement
-            ?: return@coroutineScope null
-
-        val builder = BSMetaModelBuilder(module, psiFile, custom)
-
-        val operations = listOf(
-            coroutineScope.async { builder.withEnumTypes(root.enums) },
-            coroutineScope.async { builder.withBeanTypes(root.beans) },
-            coroutineScope.async { builder.withEventTypes(root.beans) },
-        )
-
-        withContext(Dispatchers.IO) {
-            operations.awaitAll()
+    override fun process(container: String, yContainer: String, fileName: String, custom: Boolean, dom: Beans): BSMetaModel =
+        with(BSMetaModelBuilder(container, yContainer, fileName, custom)) {
+            withEnumTypes(dom.enums)
+            withBeanTypes(dom.beans)
+            withEventTypes(dom.beans)
+            build()
         }
-
-        builder.build()
-    }
 }
