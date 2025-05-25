@@ -99,6 +99,7 @@ public abstract class AbstractHybrisHacHttpClient {
     public String login(@NotNull final Project project, @NotNull final RemoteConnectionSettings settings) {
         final var hostHacURL = settings.getGeneratedURL();
         retrieveCookies(hostHacURL, project, settings);
+
         final var cookieName = getCookieName(settings);
         final var sessionId = Optional.ofNullable(cookiesPerSettings.get(settings))
             .map(it -> it.get(cookieName))
@@ -106,6 +107,11 @@ public abstract class AbstractHybrisHacHttpClient {
         if (sessionId == null) {
             return "Unable to obtain sessionId for " + hostHacURL;
         }
+
+        if (StringUtils.isNotBlank(settings.getRouteCookieValue()) && !cookiesPerSettings.get(settings).get("ROUTE").equals('.' + settings.getRouteCookieValue())) {
+            return String.format("Unable to find podId %s for %s", settings.getRouteCookieValue(), hostHacURL);
+        }
+
         final var csrfToken = getCsrfToken(hostHacURL, settings);
         final var params = List.of(
             new BasicNameValuePair("j_username", settings.getUsername()),
@@ -251,6 +257,10 @@ public abstract class AbstractHybrisHacHttpClient {
     ) {
         final var cookies = cookiesPerSettings.computeIfAbsent(settings, _settings -> new HashMap<>());
         cookies.clear();
+
+        if (StringUtils.isNotBlank(settings.getRouteCookieValue())) {
+            cookies.put("ROUTE", '.' + settings.getRouteCookieValue());
+        }
 
         final var res = getResponseForUrl(hacURL, settings);
 

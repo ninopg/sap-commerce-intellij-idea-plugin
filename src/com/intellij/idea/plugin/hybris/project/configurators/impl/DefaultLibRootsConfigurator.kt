@@ -112,11 +112,11 @@ class DefaultLibRootsConfigurator : LibRootsConfigurator {
         val libraryModifiableModel = modifiableModelsProvider.getModifiableLibraryModel(library)
         libraryModifiableModel.addRoot(VfsUtil.getUrlForLibraryRoot(javaLibraryDescriptor.libraryFile), OrderRootType.CLASSES)
 
-        val sourceDirAttached = attachSourceFiles(javaLibraryDescriptor, libraryModifiableModel).isNotEmpty()
+        // val sourceDirAttached = attachSourceFiles(javaLibraryDescriptor, libraryModifiableModel).isNotEmpty()
         attachSourceJarDirectories(javaLibraryDescriptor, libraryModifiableModel)
 
         if (sourceCodeRoot != null
-            && !sourceDirAttached
+            // && !sourceDirAttached
             && javaLibraryDescriptor.libraryFile.name.endsWith(HybrisConstants.HYBRIS_PLATFORM_CODE_SERVER_JAR_SUFFIX)
         ) {
             libraryModifiableModel.addRoot(sourceCodeRoot, OrderRootType.SOURCES)

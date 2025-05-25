@@ -46,6 +46,7 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
     var isWsl by property(false)
     var sslProtocol by string(HybrisConstants.DEFAULT_SSL_PROTOCOL)
     var sessionCookieName by string(HybrisConstants.DEFAULT_SESSION_COOKIE_NAME)
+    var routeCookieValue by string(null)
 
     var solrWebroot by string("solr")
     var hacWebroot by string("")

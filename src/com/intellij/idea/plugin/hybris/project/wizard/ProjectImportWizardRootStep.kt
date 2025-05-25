@@ -208,7 +208,7 @@ class ProjectImportWizardRootStep(context: WizardContext) : ProjectImportWizardS
                 sourceCodeFilesInChooser = cell(
                     textFieldWithBrowseButton(
                         null,
-                        FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                        FileChooserDescriptorFactory.createSingleFileOrFolderDescriptor().withExtensionFilter("Sources", "jar", "zip")
                             .withTitle(message("hybris.import.label.select.hybris.src.file"))
                     )
                 )

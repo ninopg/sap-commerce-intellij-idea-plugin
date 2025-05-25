@@ -24,7 +24,9 @@ import com.intellij.idea.plugin.hybris.startup.event.AbstractHybrisFileToolbarIn
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.project.Project
+import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.plugins.groovy.GroovyFileType
+import org.jetbrains.plugins.groovy.lang.psi.GroovyFileBase
 
 class GroovyFileToolbarInstaller : AbstractHybrisFileToolbarInstaller(
     "hybris.groovy.console",
@@ -38,21 +40,24 @@ class GroovyFileToolbarInstaller : AbstractHybrisFileToolbarInstaller(
     }
 
     override fun isToolbarEnabled(project: Project, editor: EditorEx): Boolean {
+
         val settings = DeveloperSettingsComponent.getInstance(project).state
         val file = editor.virtualFile
 
         // Checking special cases where toolbar might not be desired
         val path = file.path
+
         val isTestFile = path.contains(HybrisConstants.TEST_SRC_DIRECTORY, true)
             || path.contains(HybrisConstants.GROOVY_TEST_SRC_DIRECTORY, true)
         val isIdeConsole = path.contains(HybrisConstants.IDE_CONSOLES_PATH)
         val testFileCheckPassed = settings.groovySettings.enableActionsToolbarForGroovyTest && isTestFile || !isTestFile
         val ideConsoleCheckPassed = settings.groovySettings.enableActionsToolbarForGroovyIdeConsole && isIdeConsole || !isIdeConsole
 
+        val isScript = (file.toPsiFile(project) as? GroovyFileBase)?.isScript ?: false
+
         return Plugin.GROOVY.isActive()
-            && fileType == file.fileType
-            && settings.groovySettings.enableActionsToolbar
-            && testFileCheckPassed
-            && ideConsoleCheckPassed
+            && isScript
+            && (settings.groovySettings.enableActionsToolbar && testFileCheckPassed && ideConsoleCheckPassed)
+
     }
 }

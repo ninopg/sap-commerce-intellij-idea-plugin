@@ -40,6 +40,7 @@ class RemoteHacConnectionDialog(
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
     private lateinit var sessionCookieNameTextField: JBTextField
+    private lateinit var routeCookieValueTextField: JBTextField
 
     override fun createTestSettings() = with(RemoteConnectionSettings()) {
         type = settings.type
@@ -50,6 +51,7 @@ class RemoteHacConnectionDialog(
         sslProtocol = sslProtocolComboBox.selectedItem?.toString() ?: ""
         hacWebroot = webrootTextField.text
         sessionCookieName = sessionCookieNameTextField.text.takeIf { !it.isNullOrBlank() } ?: HybrisConstants.DEFAULT_SESSION_COOKIE_NAME
+        routeCookieValue = routeCookieValueTextField.text.takeIf { !it.isNullOrBlank() } ?: ""
         credentials = Credentials(usernameTextField.text, String(passwordTextField.password))
         this
     }
@@ -155,6 +157,16 @@ class RemoteHacConnectionDialog(
                     .comment("Optional: override the session cookie name. Default is JSESSIONID.")
                     .align(AlignX.FILL)
                     .bindText(settings::sessionCookieName.toNonNullableProperty(HybrisConstants.DEFAULT_SESSION_COOKIE_NAME))
+                    .apply { component.text = "" }
+                    .component
+            }.layout(RowLayout.PARENT_GRID)
+
+            row {
+                label("Replica Id:")
+                routeCookieValueTextField = textField()
+                    .comment("Optional: Target a specific replica.")
+                    .align(AlignX.FILL)
+                    .bindText(settings::routeCookieValue.toNonNullableProperty(""))
                     .apply { component.text = "" }
                     .component
             }.layout(RowLayout.PARENT_GRID)

@@ -241,30 +241,28 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
             return resultBuilder.errorMessage("[" + statusLine.getStatusCode() + "] " +
                 statusLine.getReasonPhrase()).build();
         }
-        final Document document;
+
+        final String jsonResponse;
+
         try {
-            document = parse(response.getEntity().getContent(), StandardCharsets.UTF_8.name(), "");
+            jsonResponse = new String(response.getEntity().getContent().readAllBytes(), StandardCharsets.UTF_8);
         } catch (final IOException e) {
+            LOG.error("Error reading response", e);
             return resultBuilder.errorMessage(e.getMessage() + ' ' + actionUrl).httpCode(SC_BAD_REQUEST).build();
         }
-        final Elements fsResultStatus = document.getElementsByTag("body");
-        if (fsResultStatus == null) {
-            return resultBuilder.errorMessage("No data in response").build();
-        }
-        final Map json = parseResponse(fsResultStatus);
 
-        if (json == null) {
-            return createResult()
-                .errorMessage("Cannot parse response from the server...")
-                .build();
+        final Map json;
+
+        try {
+            json = new Gson().fromJson(jsonResponse, HashMap.class);
+        } catch (final Exception e) {
+            LOG.error("Cannot parse response", e);
+            return createResult().errorMessage("Cannot parse response from the server...").build();
         }
 
         if (json.get("stacktraceText") != null && isNotEmpty(json.get("stacktraceText").toString())) {
-            return createResult()
-                .errorMessage(json.get("stacktraceText").toString())
-                .build();
+            return createResult().errorMessage(json.get("stacktraceText").toString()).build();
         }
-
         if (json.get("outputText") != null) {
             resultBuilder.output(json.get("outputText").toString());
         }
@@ -272,6 +270,7 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
             resultBuilder.result(json.get("executionResult").toString());
         }
         return resultBuilder.build();
+
     }
 
     @NotNull

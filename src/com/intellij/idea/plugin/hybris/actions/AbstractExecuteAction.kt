@@ -28,6 +28,8 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAware
+import org.jetbrains.plugins.groovy.lang.psi.GroovyFile
+import org.jetbrains.plugins.groovy.lang.psi.api.toplevel.imports.GrImportStatement
 
 abstract class AbstractExecuteAction(
     internal val extension: String,
@@ -43,11 +45,29 @@ abstract class AbstractExecuteAction(
     override fun actionPerformed(e: AnActionEvent) {
         val editor = CommonDataKeys.EDITOR.getData(e.dataContext) ?: return
         val project = e.project ?: return
+        val psiFile = CommonDataKeys.PSI_FILE.getData(e.dataContext) ?: return
 
         val selectionModel = editor.selectionModel
         var content = selectionModel.selectedText
         if (content == null || content.trim { it <= ' ' }.isEmpty()) {
             content = editor.document.text
+        }
+
+        if (selectionModel.hasSelection() && psiFile is GroovyFile && !psiFile.importStatements.isEmpty()) {
+
+            val document = editor.document
+            val selectionStartLine = document.getLineNumber(selectionModel.selectionStart)
+            val selectionEndLine = document.getLineNumber(selectionModel.selectionEnd)
+
+            val missingImports = psiFile.importStatements.filter { import ->
+                val importLine = document.getLineNumber(import.textOffset)
+                importLine < selectionStartLine || importLine > selectionEndLine
+            }
+
+            val importStatements = missingImports.map { it.text }
+            val importBlock = importStatements.joinToString(separator = "\n")
+            content = "$importBlock\n\n$content"
+
         }
 
         with(HybrisToolWindowService.getInstance(project)) {
@@ -62,7 +82,7 @@ abstract class AbstractExecuteAction(
             return
         }
         consoleService.setActiveConsole(console)
-        console.setInputText(content)
+        console.setInputText("/* ${psiFile.name} */\n$content")
 
         invokeLater {
             doExecute(consoleService)
