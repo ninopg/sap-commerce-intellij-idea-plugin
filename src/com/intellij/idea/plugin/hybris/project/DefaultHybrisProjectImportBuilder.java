@@ -39,6 +39,7 @@ import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.configuration.ModulesProvider;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.packaging.artifacts.ModifiableArtifactModel;
 import kotlin.Triple;
 import org.jetbrains.annotations.NotNull;
@@ -48,6 +49,9 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -159,6 +163,9 @@ public class DefaultHybrisProjectImportBuilder extends AbstractHybrisProjectImpo
         new ImportProjectProgressModalWindow(
             project, model, configuratorFactory, hybrisProjectDescriptor, modules, refresh
         ).queue();
+
+        final File platformHome = hybrisProjectDescriptor.getPlatformHybrisModuleDescriptor().getModuleRootDirectory();
+        importGSDLFile(platformHome);
 
         if (refresh) {
             PostImportConfigurator.getInstance(project).configure(hybrisProjectDescriptor, allModules, refresh);
@@ -348,6 +355,25 @@ public class DefaultHybrisProjectImportBuilder extends AbstractHybrisProjectImpo
             }
             moduleToCheck.remove(currentModule);
         }
+    }
+
+    private void importGSDLFile(final File platformHome) {
+
+        final Path path = platformHome.toPath().resolve("resources");
+        if (Files.exists(path)) {
+            try (final InputStream in = getClass().getResourceAsStream("/dsl/hacBeans.gdsl")) {
+                if (in != null) {
+                    final Path targetPath = path.resolve("hacBeans.gdsl");
+                    if (!Files.exists(targetPath)) {
+                        Files.copy(in, path.resolve("hacBeans.gdsl"));
+                        VirtualFileManager.getInstance().syncRefresh();
+                    }
+                }
+            } catch (IOException e) {
+                LOG.warn("can't create hacSpring.gdsl file", e);
+            }
+        }
+
     }
 
 }

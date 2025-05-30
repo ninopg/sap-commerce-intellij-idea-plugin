@@ -70,7 +70,7 @@ class HybrisConsoleExecuteActionHandler(
                             is HybrisSolrSearchConsole -> {
                                 console.clear()
 
-                                printCurrentHost(console, RemoteConnectionType.SOLR)
+                                printCurrentHost(console, RemoteConnectionType.SOLR, httpResult)
 
                                 if (httpResult.hasError()) {
                                     printSyntaxText(console, httpResult.errorMessage, PlainTextFileType.INSTANCE)
@@ -81,7 +81,7 @@ class HybrisConsoleExecuteActionHandler(
                             }
 
                             else -> {
-                                printCurrentHost(console, RemoteConnectionType.Hybris)
+                                printCurrentHost(console, RemoteConnectionType.Hybris, httpResult)
 
                                 printPlainText(console, httpResult)
                             }
@@ -96,12 +96,12 @@ class HybrisConsoleExecuteActionHandler(
         }
     }
 
-    private fun printCurrentHost(console: HybrisConsole, remoteConnectionType: RemoteConnectionType) {
+    private fun printCurrentHost(console: HybrisConsole, remoteConnectionType: RemoteConnectionType, httpResult: HybrisHttpResult?) {
         val activeConnectionSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, remoteConnectionType)
         console.print("[HOST] ", SYSTEM_OUTPUT)
-        activeConnectionSettings.displayName
-            ?.let { console.print("($it) ", LOG_INFO_OUTPUT) }
-        console.print("${activeConnectionSettings.generatedURL}\n", NORMAL_OUTPUT)
+        activeConnectionSettings.displayName?.let { console.print("($it) ", LOG_INFO_OUTPUT) }
+        console.print(activeConnectionSettings.generatedURL, NORMAL_OUTPUT)
+        httpResult?.route?.let { console.print(" [ROUTE] $it\n", NORMAL_OUTPUT) }
     }
 
     private fun printPlainText(console: HybrisConsole, httpResult: HybrisHttpResult?) {

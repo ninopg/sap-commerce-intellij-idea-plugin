@@ -77,8 +77,9 @@ public abstract class AbstractHybrisHacHttpClient {
 
     private static final Logger LOG = Logger.getInstance(AbstractHybrisHacHttpClient.class);
     public static final int DEFAULT_HAC_TIMEOUT = 6000;
-    private static final X509TrustManager X_509_TRUST_MANAGER = new X509TrustManager() {
+    public static final String ROUTE_COOKIE_NAME = "ROUTE";
 
+    private static final X509TrustManager X_509_TRUST_MANAGER = new X509TrustManager() {
         @Override
         @Nullable
         public X509Certificate[] getAcceptedIssuers() {
@@ -108,8 +109,8 @@ public abstract class AbstractHybrisHacHttpClient {
             return "Unable to obtain sessionId for " + hostHacURL;
         }
 
-        if (StringUtils.isNotBlank(settings.getRouteCookieValue()) && !cookiesPerSettings.get(settings).get("ROUTE").equals('.' + settings.getRouteCookieValue())) {
-            return String.format("Unable to find podId %s for %s", settings.getRouteCookieValue(), hostHacURL);
+        if (StringUtils.isNotBlank(settings.getReplicaId()) && !cookiesPerSettings.get(settings).get(ROUTE_COOKIE_NAME).equals('.' + settings.getReplicaId())) {
+            return String.format("Unable to find podId %s for %s", settings.getReplicaId(), hostHacURL);
         }
 
         final var csrfToken = getCsrfToken(hostHacURL, settings);
@@ -173,6 +174,7 @@ public abstract class AbstractHybrisHacHttpClient {
             }
             return createErrorResponse("Unable to obtain csrfToken for sessionId=" + sessionId);
         }
+        // REVIEWME: client is created for each request
         final var client = createAllowAllClient(timeout);
         if (client == null) {
             return createErrorResponse("Unable to create HttpClient");
@@ -189,6 +191,8 @@ public abstract class AbstractHybrisHacHttpClient {
         post.setHeader("Sec-Fetch-Dest", "empty");
         post.setHeader("Sec-Fetch-Mode", "cors");
         post.setHeader("Sec-Fetch-Site", "same-origin");
+
+        LOG.info("POST request: " + post);
 
         final HttpResponse response;
         try {
@@ -258,8 +262,8 @@ public abstract class AbstractHybrisHacHttpClient {
         final var cookies = cookiesPerSettings.computeIfAbsent(settings, _settings -> new HashMap<>());
         cookies.clear();
 
-        if (StringUtils.isNotBlank(settings.getRouteCookieValue())) {
-            cookies.put("ROUTE", '.' + settings.getRouteCookieValue());
+        if (StringUtils.isNotBlank(settings.getReplicaId())) {
+            cookies.put(ROUTE_COOKIE_NAME, '.' + settings.getReplicaId());
         }
 
         final var res = getResponseForUrl(hacURL, settings);
@@ -274,6 +278,14 @@ public abstract class AbstractHybrisHacHttpClient {
         return StringUtils.isNotBlank(sessionCookieName) ? sessionCookieName : HybrisConstants.DEFAULT_SESSION_COOKIE_NAME;
     }
 
+    protected String getRouteCookie(final RemoteConnectionSettings settings) {
+        // If the settings do not have a route cookie, return null
+        if (!cookiesPerSettings.containsKey(settings) || !cookiesPerSettings.get(settings).containsKey(ROUTE_COOKIE_NAME)) {
+            return null;
+        }
+        return cookiesPerSettings.get(settings).get(ROUTE_COOKIE_NAME);
+    }
+
     @Nullable
     protected Response getResponseForUrl(
         final String hacURL,
@@ -281,7 +293,11 @@ public abstract class AbstractHybrisHacHttpClient {
     ) {
         try {
             final var sslProtocol = settings.getSslProtocol();
-            return connect(hacURL, sslProtocol).method(Method.GET).execute();
+            var connection = connect(hacURL, sslProtocol);
+            if (StringUtils.isNotBlank(settings.getReplicaId())) {
+                connection = connection.cookies(Map.of(ROUTE_COOKIE_NAME, '.' + settings.getReplicaId()));
+            }
+            return connection.method(Method.GET).execute();
         } catch (ConnectException ce) {
             return null;
         } catch (NoSuchAlgorithmException | IOException | KeyManagementException | ValidationException e) {
@@ -310,7 +326,6 @@ public abstract class AbstractHybrisHacHttpClient {
 
     private Connection connect(@NotNull final String url, final String sslProtocol) throws NoSuchAlgorithmException, KeyManagementException {
         final TrustManager[] trustAllCerts = new TrustManager[]{X_509_TRUST_MANAGER};
-
         final SSLContext sc = SSLContext.getInstance(sslProtocol);
         sc.init(null, trustAllCerts, new SecureRandom());
         HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());

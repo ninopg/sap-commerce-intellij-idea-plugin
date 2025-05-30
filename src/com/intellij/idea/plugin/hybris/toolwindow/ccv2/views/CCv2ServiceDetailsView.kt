@@ -18,14 +18,19 @@
 
 package com.intellij.idea.plugin.hybris.toolwindow.ccv2.views
 
+import com.intellij.ide.HelpTooltip
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
 import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
 import com.intellij.idea.plugin.hybris.tools.ccv2.actions.CCv2FetchEnvironmentServiceAction
 import com.intellij.idea.plugin.hybris.tools.ccv2.actions.CCv2ServiceRestartReplicaAction
+import com.intellij.idea.plugin.hybris.tools.ccv2.api.CCv2Api
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2ServiceDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2ServiceProperties
 import com.intellij.idea.plugin.hybris.tools.ccv2.ui.*
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
+import com.intellij.idea.plugin.hybris.toolwindow.RemoteHacConnectionDialog
 import com.intellij.idea.plugin.hybris.ui.Dsl
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
@@ -42,8 +47,10 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
+import okhttp3.internal.notify
 import java.awt.GridBagLayout
 import java.io.Serial
+import java.net.SocketTimeoutException
 import javax.swing.JPanel
 
 class CCv2ServiceDetailsView(
@@ -282,9 +289,27 @@ class CCv2ServiceDetailsView(
 
                             panel {
                                 row {
-                                    label(replica.name)
-                                        .bold()
-                                        .comment("Name")
+                                    link(replica.name) {
+                                        val subscriptionDetails = CCv2Service.getInstance(project).getSubscriptionDetails(subscription)
+                                        val settings = RemoteConnectionUtil.createDefaultRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+                                        val serviceName = replica.name.split("-").firstOrNull() ?: replica.name
+                                        settings.displayName = "${subscription.name}.${environment.code}.${serviceName}"
+                                        settings.port = ""
+                                        settings.hostIP = subscriptionDetails?.let {
+                                            "${serviceName}.${it.customerCode}-${it.externalCode}-${environment.code}-public.model-t.cc.commerce.ondemand.com"
+                                        } ?: ""
+                                        settings.replicaId = replica.name
+                                        val dialog = RemoteHacConnectionDialog(project, this@CCv2ServiceDetailsView, settings)
+                                        dialog.hosts = listOf("host1","host2") // CCv2Api.getInstance(project).getServiceReplicaEndpoint(subscription, environment, service, replica)
+                                        dialog.showAndGet()
+                                    }
+                                    .bold()
+                                    .comment("Name")
+                                    .applyToComponent {
+                                        HelpTooltip()
+                                            .setTitle("Create a remote connection to the replica")
+                                            .installOn(this)
+                                    }
                                 }
                             }.gap(RightGap.COLUMNS)
 
@@ -334,7 +359,12 @@ class CCv2ServiceDetailsView(
             }
         }
     }
-        .let { Dsl.scrollPanel(it) }
+    .let { Dsl.scrollPanel(it) }
+
+    /** create a function to create a friendly name for the serviceName: remove prefix hcs_platform_ and hcs_search_ from service name */
+    private fun friendlyServiceName(serviceName: String): String? {
+        return serviceName.removePrefix("hcs_platform_").removePrefix("hcs_search_").removePrefix("hcs_")
+    }
 
     companion object {
         @Serial

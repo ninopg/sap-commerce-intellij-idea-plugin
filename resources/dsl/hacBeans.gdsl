@@ -1,0 +1,56 @@
+package dsl
+
+/*
+ * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+contributor(context(scope: scriptScope(name: '.*.groovy'))) {
+
+    property name: 'spring', type: 'de.hybris.platform.spring.ctx.CloseAwareApplicationContext'
+
+    property name: 'configurationService', type: 'de.hybris.platform.servicelayer.config.ConfigurationService'
+    property name: 'flexibleSearchService', type: 'de.hybris.platform.servicelayer.search.FlexibleSearchService'
+    property name: 'modelService', type: 'de.hybris.platform.servicelayer.model.ModelService'
+    property name: 'typeService', type: 'de.hybris.platform.servicelayer.type.TypeService'
+    property name: 'typeManager', type: 'de.hybris.platform.jalo.type.TypeManager'
+    property name: 'typeFacade', type: 'com.hybris.cockpitng.dataaccess.facades.type.impl.DefaultTypeFacade'
+    property name: 'userService', type: 'de.hybris.platform.servicelayer.user.UserService'
+    property name: 'baseStoreService', type: 'de.hybris.platform.store.services.BaseStoreService'
+    property name: 'storeSessionFacade', type: 'de.hybris.platform.commercefacades.storesession.StoreSessionFacade'
+    property name: 'baseSiteService', type: 'de.hybris.platform.site.BaseSiteService'
+    property name: 'authenticationService', type: 'de.hybris.platform.servicelayer.security.auth.AuthenticationService'
+    property name: 'logsMetricsReporterService', type: 'de.hybris.platform.metrics.dropwizard.MetricsReporterService'
+    property name: 'jdbcTemplate', type: 'org.springframework.jdbc.core.JdbcTemplate'
+    property name: 'importService', type: 'de.hybris.platform.servicelayer.impex.ImportService'
+    property name: 'exportService', type: 'de.hybris.platform.servicelayer.impex.ExportService'
+    property name: 'mediaService', type: 'de.hybris.platform.servicelayer.media.MediaService'
+    property name: 'commonI18NService', type: 'de.hybris.platform.servicelayer.i18n.CommonI18NService'
+    property name: 'sessionService', type: 'de.hybris.platform.servicelayer.session.SessionService'
+    property name: 'searchRestrictionService', type: 'de.hybris.platform.search.restriction.SearchRestrictionService'
+    property name: 'cartService', type: 'de.hybris.platform.order.CartService'
+    property name: 'cartFacade', type: 'de.hybris.platform.commercefacades.order.CartFacade'
+    property name: 'facetSearchConfigService', type: 'de.hybris.platform.solrfacetsearch.config.FacetSearchConfigService'
+    property name: 'cronJobService', type: 'de.hybris.platform.servicelayer.cronjob.CronJobService'
+    property name: 'catalogService', type: 'de.hybris.platform.catalog.CatalogService'
+    property name: 'catalogVersionService', type: 'de.hybris.platform.catalog.CatalogVersionService'
+    property name: 'cmsSiteService', type: 'de.hybris.platform.cms2.servicelayer.services.CMSSiteService'
+    property name: 'springELValueProvider', type: 'de.hybris.platform.solrfacetsearch.provider.impl.SpELValueProvider'
+    property name: 'productFacade', type: 'de.hybris.platform.commercefacades.product.ProductFacade'
+    property name: 'scriptingLanguagesService', type: 'de.hybris.platform.scripting.engine.ScriptingLanguagesService'
+    property name: 'enumerationService', type: 'de.hybris.platform.enumeration.impl.DefaultEnumerationService'
+
+}

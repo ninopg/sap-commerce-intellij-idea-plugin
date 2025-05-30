@@ -29,6 +29,9 @@
                              provider="com.intellij.idea.plugin.hybris.settings.options.ProjectGroovySettingsConfigurableProvider"/>
 
         <applicationService serviceImplementation="com.intellij.idea.plugin.hybris.groovy.file.GroovyFileToolbarInstaller"/>
+
+        <!-- <postStartupActivity implementation="com.intellij.idea.plugin.hybris.startup.GDSLStartupActivity"/> -->
+
     </extensions>
 
     <actions>

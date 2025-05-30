@@ -18,7 +18,9 @@
 
 package com.intellij.idea.plugin.hybris.tools.ccv2.api
 
+import com.intellij.idea.plugin.hybris.ccv1.api.SubscriptionApi
 import com.intellij.idea.plugin.hybris.ccv1.invoker.infrastructure.ClientException
+import com.intellij.idea.plugin.hybris.ccv1.model.SubscriptionDetailDTO
 import com.intellij.idea.plugin.hybris.ccv2.api.*
 import com.intellij.idea.plugin.hybris.ccv2.invoker.infrastructure.ApiClient
 import com.intellij.idea.plugin.hybris.ccv2.model.CreateBuildRequestDTO
@@ -27,6 +29,7 @@ import com.intellij.idea.plugin.hybris.ccv2.model.DeploymentDetailDTO
 import com.intellij.idea.plugin.hybris.ccv2.model.EnvironmentDetailDTO
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.settings.components.ApplicationSettingsComponent
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.*
 import com.intellij.openapi.application.ApplicationManager
@@ -48,11 +51,22 @@ class CCv2Api {
             .readTimeout(ApplicationSettingsComponent.getInstance().state.ccv2ReadTimeout.toLong(), TimeUnit.SECONDS)
             .build()
     }
+    private val subscriptionApi by lazy { SubscriptionApi(client = apiClient) }
     private val environmentApi by lazy { EnvironmentApi(client = apiClient) }
     private val deploymentApi by lazy { DeploymentApi(client = apiClient) }
     private val buildApi by lazy { BuildApi(client = apiClient) }
     private val servicePropertiesApi by lazy { ServicePropertiesApi(client = apiClient) }
     private val databackupApi by lazy { DatabackupApi(client = apiClient) }
+
+    suspend fun getSubscriptionDetails(
+        ccv2Token: String,
+        subscription: CCv2Subscription
+    ): SubscriptionDetailDTO? {
+        return subscriptionApi.getSubscription(
+            subscriptionCode = subscription.id!!,
+            requestHeaders = createRequestParams(ccv2Token)
+        )
+    }
 
     suspend fun fetchEnvironments(
         ccv2Token: String,
@@ -70,6 +84,7 @@ class CCv2Api {
         val subscriptionCode = subscription.id!!
 
         val subscriptionPermissions = subscriptions2Permissions[subscriptionCode]
+            ?: subscriptions2Permissions["SYSTEM"]
             ?: return emptyList()
 
         return progressReporter.sizedStep(1, "Fetching Environments for subscription: $subscription") {

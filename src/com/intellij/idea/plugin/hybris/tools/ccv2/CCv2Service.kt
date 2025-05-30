@@ -19,9 +19,11 @@
 package com.intellij.idea.plugin.hybris.tools.ccv2
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.idea.plugin.hybris.ccv1.model.SubscriptionDetailDTO
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.notifications.Notifications
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.settings.components.ApplicationSettingsComponent
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.settings.options.ApplicationCCv2SettingsConfigurableProvider
@@ -744,6 +746,16 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
             .system(true)
             .notify(project)
         return null
+    }
+
+    fun getSubscriptionDetails(
+        subscription: CCv2Subscription
+    ): SubscriptionDetailDTO? {
+        return runBlocking {
+            getCCv2Token(subscription)?.let {
+                CCv2Api.getInstance().getSubscriptionDetails(it, subscription)
+            }
+        }
     }
 
     private fun notifyOnTimeout(subscription: CCv2Subscription) {

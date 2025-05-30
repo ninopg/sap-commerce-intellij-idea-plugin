@@ -33,8 +33,9 @@ public class DefaultHybrisProjectService implements HybrisProjectService {
 
     @Override
     public boolean isConfigModule(@NotNull final File file) {
-        return new File(file, HybrisConstants.LOCAL_EXTENSIONS_XML).isFile()
-               && new File(file, HybrisConstants.LOCAL_PROPERTIES_FILE).isFile();
+        return new File(file, HybrisConstants.LOCAL_EXTENSIONS_XML).isFile();
+            // aa: local.properties is not strictly required for config module
+            // && new File(file, HybrisConstants.LOCAL_PROPERTIES_FILE).isFile();
     }
 
     @Override

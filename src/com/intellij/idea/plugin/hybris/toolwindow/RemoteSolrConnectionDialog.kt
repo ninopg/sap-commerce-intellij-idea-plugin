@@ -75,13 +75,16 @@ class RemoteSolrConnectionDialog(
         group("Host Settings") {
             row {
                 label("Address:")
-                hostTextField = textField()
-                    .comment("Host name or IP address")
-                    .align(AlignX.FILL)
-                    .bindText(settings::hostIP.toNonNullableProperty(HybrisConstants.DEFAULT_HOST_URL))
-                    .onChanged { urlPreviewLabel.text = generateUrl() }
-                    .addValidationRule("Address cannot be blank.") { it.text.isNullOrBlank() }
-                    .component
+                hostEditableComboBox = comboBox(
+                    listOf("localhost"),
+                    renderer = SimpleListCellRenderer.create("?") { it }
+                )
+                .comment("Host name or IP address")
+                .align(AlignX.FILL)
+                .bindItem(settings::hostIP.toNonNullableProperty(HybrisConstants.DEFAULT_HOST_URL))
+                .onChanged { urlPreviewLabel.text = generateUrl() }
+                .addValidationRule("Address cannot be blank.") { it.selectedItem?.toString().isNullOrBlank() }
+                .component.apply { isEditable = true }
             }.layout(RowLayout.PARENT_GRID)
 
             row {
@@ -142,7 +145,7 @@ class RemoteSolrConnectionDialog(
 
     override fun createTestSettings() = with(RemoteConnectionSettings()) {
         type = settings.type
-        hostIP = hostTextField.text
+        hostIP = hostEditableComboBox.selectedItem?.toString()
         port = portTextField.text
         isSsl = sslProtocolCheckBox.isSelected
         isWsl = isWslCheckBox?.isSelected ?: false

@@ -23,6 +23,8 @@ servers:
 tags:
   - name: permissions
     description: Endpoints for managing permissions
+  - name: subscription
+    description: Endpoints for managing subscriptions
   - name: environment
     description: Endpoints for managing environments
 paths:
@@ -42,6 +44,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PermissionsDetailDTO'
+        '4XX':
+          $ref: '#/components/responses/DefaultResponse'
+        '5XX':
+          $ref: '#/components/responses/DefaultResponse'
+  /subscriptions/{subscriptionCode}:
+    parameters:
+      - name: subscriptionCode
+        in: path
+        description: Customer subscription code
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - subscription
+      description: Get subscription details
+      operationId: getSubscription
+      parameters:
+        - $ref: '#/components/parameters/EndpointWebProxyFilter'
+        - $ref: '#/components/parameters/EndpointServiceFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDetailDTO'
         '4XX':
           $ref: '#/components/responses/DefaultResponse'
         '5XX':
@@ -276,6 +305,41 @@ components:
           description: Human-readable explanation specific to this occurrence of the problem
           type: string
           readOnly: true
+    SubscriptionDetailDTO:
+      description: Entity to represent a subscription
+      type: object
+      required:
+        - code
+        - customerCode
+        - externalCode
+      properties:
+        code:
+          description: Subscription code
+          type: string
+        customerCode:
+          description: Customer code
+          type: string
+        externalCode:
+          description: External code
+          type: string
+        name:
+          description: Subscription name
+          type: string
+        customerName:
+          description: Customer name
+          type: string
+        status:
+          description: Subscription status
+          type: string
+        regionCode:
+          description: Region code
+          type: string
+        regionName:
+          description: Region name
+          type: string
+        internal:
+          description: Internal subscription
+          type: boolean
     EnvironmentDetailDTO:
       description: Entity to represent an environment
       type: object
@@ -303,6 +367,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MediaStorageDTO'
+        endpoints:
+          description: Endpoints
+          type: array
+          items:
+            $ref: '#/components/schemas/EndPointDTO'
+        webProxies:
+          description: Web Proxies
+          type: array
+          items:
+            $ref: '#/components/schemas/WebProxyDTO'
+        clusters:
+          description: Clusters
+          type: array
+          items:
+            $ref: '#/components/schemas/ClusterDTO'
     EnvironmentHealthDTO:
       description: Entity to represent problems of the environment
       type: object
@@ -320,7 +399,7 @@ components:
         - publicUrl
       properties:
         code:
-          description: Description
+          description: Code
           type: string
         name:
           description: Name
@@ -330,6 +409,70 @@ components:
           type: string
         publicUrl:
           description: Public URL
+          type: string
+    EndPointDTO:
+      description: Entity to represent an endpoint
+      type: object
+      required:
+        - code
+        - domainName
+        - k8sService
+      properties:
+        code:
+          description: Code
+          type: string
+        name:
+          description: Name
+          type: string
+        description:
+          description: Description
+          type: string
+        priority:
+          description: Priority
+          type: integer
+        domainName:
+          description: Domain Name
+          type: string
+        protocol:
+          description: Protocol
+          type: string
+        k8sService:
+          description: Kubernetes Service
+          type: string
+        webProxy:
+          description: Web Proxy
+          type: string
+    WebProxyDTO:
+      description: Entity to represent web proxy
+      type: object
+      required:
+        - code
+        - ipAddress
+        - defaultDnsEntry
+      properties:
+        code:
+          description: Code
+          type: string
+        name:
+          description: Name
+          type: string
+        description:
+          description: Description
+          type: string
+        ipAddress:
+          description: ip Address
+          type: string
+        defaultDnsEntry:
+          description: Default DNS entry
+          type: string
+    ClusterDTO:
+      description: Entity to represent a cluster
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          description: Code
           type: string
     PermissionsDetailDTO:
       description: Entity to represent permissions to all subscriptions of the current user

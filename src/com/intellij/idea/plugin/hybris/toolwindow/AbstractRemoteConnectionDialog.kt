@@ -23,6 +23,7 @@ import com.intellij.credentialStore.Credentials
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.ide.passwordSafe.PasswordSafe
+import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.openapi.application.ModalityState
@@ -56,11 +57,11 @@ abstract class AbstractRemoteConnectionDialog(
     protected val settings: RemoteConnectionSettings,
     dialogTitle: String
 ) : DialogWrapper(project, parentComponent, false, IdeModalityType.IDE) {
-
     private val originalScope = settings.scope
+    var hosts: List<String> = emptyList<String>()
     protected lateinit var connectionNameTextField: JBTextField
     protected lateinit var urlPreviewLabel: JLabel
-    protected lateinit var hostTextField: JBTextField
+    protected lateinit var hostEditableComboBox: JComboBox<String>
     protected lateinit var portTextField: JBTextField
     protected lateinit var sslProtocolCheckBox: JBCheckBox
     protected lateinit var webrootTextField: JBTextField
@@ -77,6 +78,8 @@ abstract class AbstractRemoteConnectionDialog(
 
         @Serial
         private val serialVersionUID: Long = 7851071514284300449L
+
+        // add and instance property here to set a list of hosts of type `List<String>`
 
         override fun doAction(e: ActionEvent?) {
             this.isEnabled = false
@@ -170,7 +173,7 @@ abstract class AbstractRemoteConnectionDialog(
 
     protected fun generateUrl() = RemoteConnectionUtil.generateUrl(
         sslProtocolCheckBox.isSelected,
-        hostTextField.text,
+        hostEditableComboBox.selectedItem?.toString(),
         portTextField.text,
         webrootTextField.text,
     )
@@ -181,7 +184,7 @@ abstract class AbstractRemoteConnectionDialog(
             ?.toString()
             ?.replace("/", "")
             ?: ""
-        hostTextField.text = wslIp
+        hostEditableComboBox.selectedItem = wslIp
     }
 
     fun isWindows() = System.getProperty("os.name").lowercase(Locale.getDefault()).contains("win")

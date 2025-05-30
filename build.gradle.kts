@@ -41,6 +41,7 @@ repositories {
     intellijPlatform {
         defaultRepositories()
         jetbrainsRuntime()
+        jetbrainsIdeInstallers()
     }
 }
 

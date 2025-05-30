@@ -30,6 +30,7 @@ object HybrisUtil {
     fun isHybrisModuleRoot(file: File) = File(file, HybrisConstants.EXTENSION_INFO_XML).isFile
     fun isHybrisModuleRoot(file: VirtualFile) = file.findChild(HybrisConstants.EXTENSION_INFO_XML) != null
 
+    // REVIEWME: this method potentially might scan a lot of files
     fun isPotentialHybrisProject(file: VirtualFile): Boolean {
         val key = Key.create<Boolean>("IS_HYBRIS_FILE")
         file.putUserData(key, false)

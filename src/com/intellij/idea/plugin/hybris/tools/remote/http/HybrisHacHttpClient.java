@@ -236,12 +236,12 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
 
         final HttpResponse response = post(project, actionUrl, params, true, timeout, settings);
         final StatusLine statusLine = response.getStatusLine();
+
         resultBuilder = resultBuilder.httpCode(statusLine.getStatusCode());
         if (statusLine.getStatusCode() != SC_OK || response.getEntity() == null) {
             return resultBuilder.errorMessage("[" + statusLine.getStatusCode() + "] " +
                 statusLine.getReasonPhrase()).build();
         }
-
         final String jsonResponse;
 
         try {
@@ -269,6 +269,9 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
         if (json.get("executionResult") != null) {
             resultBuilder.result(json.get("executionResult").toString());
         }
+
+        resultBuilder.route(getRouteCookie(settings));
+
         return resultBuilder.build();
 
     }
