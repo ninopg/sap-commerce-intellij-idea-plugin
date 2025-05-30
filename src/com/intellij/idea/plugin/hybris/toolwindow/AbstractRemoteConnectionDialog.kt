@@ -25,6 +25,7 @@ import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
@@ -55,10 +56,10 @@ abstract class AbstractRemoteConnectionDialog(
     protected val project: Project,
     parentComponent: Component,
     protected val settings: RemoteConnectionSettings,
+    protected val hosts: List<String> = emptyList(),
     dialogTitle: String
 ) : DialogWrapper(project, parentComponent, false, IdeModalityType.IDE) {
     private val originalScope = settings.scope
-    var hosts: List<String> = emptyList<String>()
     protected lateinit var connectionNameTextField: JBTextField
     protected lateinit var urlPreviewLabel: JLabel
     protected lateinit var hostEditableComboBox: JComboBox<String>

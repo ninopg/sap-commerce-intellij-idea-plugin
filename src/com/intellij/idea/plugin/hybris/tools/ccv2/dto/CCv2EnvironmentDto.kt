@@ -39,6 +39,8 @@ data class CCv2EnvironmentDto(
     val mediaStorages: Collection<CCv2MediaStorageDto>,
     var services: Collection<CCv2ServiceDto>? = null,
     var dataBackups: Collection<CCv2DataBackupDto>? = null,
+    val endpoints: List<CCv2EndPointDto>,
+    val webProxies: List<CCv2WebProxyDto>,
 ) : CCv2DTO, Comparable<CCv2EnvironmentDto> {
 
     fun canDeploy() = (status in listOf(CCv2EnvironmentStatus.READY_FOR_DEPLOYMENT, CCv2EnvironmentStatus.AVAILABLE))
@@ -66,6 +68,16 @@ data class CCv2EnvironmentDto(
                 ?.map { CCv2MediaStorageDto.map(environment, it) }
                 ?: emptyList())
 
+            val endpoints = v1Environment
+            ?.endpoints
+                ?.map { CCv2EndPointDto.map(it) }
+                ?: emptyList()
+
+            val webProxies = v1Environment
+                ?.webProxies
+                ?.map { CCv2WebProxyDto.map(it) }
+                ?: emptyList()
+
             return CCv2EnvironmentDto(
                 code = code ?: "N/A",
                 name = environment.name ?: "N/A",
@@ -77,7 +89,9 @@ data class CCv2EnvironmentDto(
                 loggingLink = v1Environment?.loggingUrl?.let { "$it/app/discover" },
                 problems = v1EnvironmentHealth?.problems,
                 link = link,
-                mediaStorages = mediaStorages
+                mediaStorages = mediaStorages,
+                endpoints = endpoints,
+                webProxies = webProxies
             )
         }
     }

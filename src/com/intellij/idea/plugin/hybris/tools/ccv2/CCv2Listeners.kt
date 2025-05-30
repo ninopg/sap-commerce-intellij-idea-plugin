@@ -19,6 +19,7 @@
 package com.intellij.idea.plugin.hybris.tools.ccv2
 
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.*
 
 sealed interface CCv2Listener<T : CCv2DTO> {
@@ -34,6 +35,7 @@ interface CCv2SettingsListener {
     fun onActiveSubscriptionChanged(subscription: CCv2Subscription?) = Unit
 }
 
+interface CCv2SubscriptionsListener : CCv2Listener<CCv2SubscriptionDetailsDto>
 interface CCv2EnvironmentsListener : CCv2Listener<CCv2EnvironmentDto>
 interface CCv2DeploymentsListener : CCv2Listener<CCv2DeploymentDto>
 

@@ -19,6 +19,7 @@
 package com.intellij.idea.plugin.hybris.toolwindow.ccv2.views
 
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2DTO
 import com.intellij.idea.plugin.hybris.toolwindow.ccv2.CCv2Tab
 import com.intellij.idea.plugin.hybris.ui.Dsl
@@ -41,11 +42,9 @@ abstract class AbstractCCv2DataView<T : CCv2DTO> {
                         .align(Align.CENTER)
                         .resizableColumn()
                 }.resizableRow()
-            }
-                .expanded = true
+            }.expanded = true
         }
-    }
-        .let { Dsl.scrollPanel(it) }
+    }.let { Dsl.scrollPanel(it) }
 
     fun noDataPanel(): DialogPanel = panel {
         noData()

@@ -19,7 +19,6 @@
 package com.intellij.idea.plugin.hybris.tools.ccv2
 
 import com.intellij.ide.BrowserUtil
-import com.intellij.idea.plugin.hybris.ccv1.model.SubscriptionDetailDTO
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.notifications.Notifications
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
@@ -60,16 +59,18 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
         sendEvents: Boolean = true,
     ) {
         onStartCallback.invoke()
+
+        val subscriptionsDtos = subscriptions.map { it.toDto() }
+
         if (sendEvents) project.messageBus.syncPublisher(TOPIC_ENVIRONMENT).onFetchingStarted(subscriptions)
 
         val ccv2Settings = DeveloperSettingsComponent.getInstance(project).state.ccv2Settings
-        val statuses = ccv2Settings.showEnvironmentStatuses
-            .map { it.name }
+        val statuses = ccv2Settings.showEnvironmentStatuses.map { it.name }
 
         coroutineScope.launch {
             withBackgroundProgress(project, "Fetching CCv2 Environments...", true) {
                 val environments = sortedMapOf<CCv2Subscription, Collection<CCv2EnvironmentDto>>()
-                reportProgress(subscriptions.size) { progressReporter ->
+                reportProgress(subscriptionsDtos.size) { progressReporter ->
                     coroutineScope {
                         subscriptions
                             .map { subscription ->
@@ -77,13 +78,13 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
                                     subscription to (getCCv2Token(subscription)
                                         ?.let { ccv2Token ->
                                             try {
+                                                subscription.details = CCv2Api.getInstance().fetchSubscriptionDetails(ccv2Token, subscription)
                                                 return@let CCv2Api.getInstance().fetchEnvironments(ccv2Token, subscription, statuses, progressReporter)
                                             } catch (e: SocketTimeoutException) {
                                                 notifyOnTimeout(subscription)
                                             } catch (e: RuntimeException) {
                                                 notifyOnException(subscription, e)
                                             }
-
                                             return@let emptyList()
                                         }
                                         ?: emptyList())
@@ -748,16 +749,6 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
         return null
     }
 
-    fun getSubscriptionDetails(
-        subscription: CCv2Subscription
-    ): SubscriptionDetailDTO? {
-        return runBlocking {
-            getCCv2Token(subscription)?.let {
-                CCv2Api.getInstance().getSubscriptionDetails(it, subscription)
-            }
-        }
-    }
-
     private fun notifyOnTimeout(subscription: CCv2Subscription) {
         Notifications
             .create(
@@ -798,6 +789,7 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
     companion object {
 
         val TOPIC_CCV2_SETTINGS = Topic("HYBRIS_CCV2_SETTINGS", CCv2SettingsListener::class.java)
+        val TOPIC_SUBSCRIPTION = Topic("HYBRIS_CCV2_SUBSCRIPTIONS_LISTENER", CCv2SubscriptionsListener::class.java)
         val TOPIC_ENVIRONMENT = Topic("HYBRIS_CCV2_ENVIRONMENTS_LISTENER", CCv2EnvironmentsListener::class.java)
         val TOPIC_BUILDS = Topic("HYBRIS_CCV2_BUILDS_LISTENER", CCv2BuildsListener::class.java)
         val TOPIC_DEPLOYMENTS = Topic("HYBRIS_CCV2_DEPLOYMENTS_LISTENER", CCv2DeploymentsListener::class.java)

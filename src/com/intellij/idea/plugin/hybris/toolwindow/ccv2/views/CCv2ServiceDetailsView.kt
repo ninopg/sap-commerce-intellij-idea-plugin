@@ -226,7 +226,7 @@ class CCv2ServiceDetailsView(
     private fun rootPanel() = panel {
         indent {
             row {
-                label("${environment.name} - ${service.name}")
+                label("${subscription.name} - ${environment.name} - ${service.name}")
                     .comment("Service")
                     .bold()
                     .component.also {
@@ -289,26 +289,34 @@ class CCv2ServiceDetailsView(
 
                             panel {
                                 row {
-                                    link(replica.name) {
-                                        val subscriptionDetails = CCv2Service.getInstance(project).getSubscriptionDetails(subscription)
-                                        val settings = RemoteConnectionUtil.createDefaultRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
-                                        val serviceName = replica.name.split("-").firstOrNull() ?: replica.name
-                                        settings.displayName = "${subscription.name}.${environment.code}.${serviceName}"
-                                        settings.port = ""
-                                        settings.hostIP = subscriptionDetails?.let {
-                                            "${serviceName}.${it.customerCode}-${it.externalCode}-${environment.code}-public.model-t.cc.commerce.ondemand.com"
-                                        } ?: ""
-                                        settings.replicaId = replica.name
-                                        val dialog = RemoteHacConnectionDialog(project, this@CCv2ServiceDetailsView, settings)
-                                        dialog.hosts = listOf("host1","host2") // CCv2Api.getInstance(project).getServiceReplicaEndpoint(subscription, environment, service, replica)
-                                        dialog.showAndGet()
-                                    }
-                                    .bold()
-                                    .comment("Name")
-                                    .applyToComponent {
-                                        HelpTooltip()
-                                            .setTitle("Create a remote connection to the replica")
-                                            .installOn(this)
+                                    if (listOf("accstorefront", "api", "backoffice", "backgroundprocessing", "solr").any { replica.name.startsWith(it) }) {
+                                        link(replica.name) {
+                                            // val subscriptionDetails = CCv2Service.getInstance(project).getSubscriptionDetails(subscription)
+                                            val settings = RemoteConnectionUtil.createDefaultRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+                                            val serviceName = replica.name.split("-").firstOrNull() ?: replica.name
+                                            settings.displayName = "${subscription.name}.${environment.code}.${serviceName}"
+                                            settings.port = ""
+                                            val webProxy = environment.webProxies.firstOrNull { it.code == "public" }
+                                            environment.services?.firstOrNull{ it.code == "hac_admin" }?.let { hacService ->
+                                                // settings.username = hacService.customerProperties.get("admin")
+                                                // hacService.initialPasswords?.get("admin")?.let { pwd -> settings.password = pwd }
+                                            }
+                                            settings.hostIP = webProxy?.defaultDnsEntry?.replace(Regex("^\\*"), serviceName) ?: ""
+                                            settings.replicaId = replica.name
+                                            val matchingEndpoints =
+                                                environment.endpoints.filter { it.k8sService == serviceName }.sortedBy { it.priority ?: Int.MAX_VALUE }.map { it.domainName }
+                                            RemoteHacConnectionDialog(project, this@CCv2ServiceDetailsView, settings, matchingEndpoints).showAndGet()
+                                        }
+                                            .bold()
+                                            .comment("Name")
+                                            .applyToComponent {
+                                                HelpTooltip()
+                                                    .setTitle("Create a remote connection to the replica")
+                                                    .installOn(this)
+                                            }
+                                    } else {
+                                        label(replica.name)
+                                            .comment("Name")
                                     }
                                 }
                             }.gap(RightGap.COLUMNS)
@@ -322,7 +330,7 @@ class CCv2ServiceDetailsView(
                         }.layout(RowLayout.PARENT_GRID)
                     }
                 }
-            }
+            }.expanded = true
 
             if (service.supportedProperties.contains(CCv2ServiceProperties.INITIAL_PASSWORDS)) {
                 collapsibleGroup(CCv2ServiceProperties.INITIAL_PASSWORDS.title) {

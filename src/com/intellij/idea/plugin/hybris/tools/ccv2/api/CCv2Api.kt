@@ -58,13 +58,15 @@ class CCv2Api {
     private val servicePropertiesApi by lazy { ServicePropertiesApi(client = apiClient) }
     private val databackupApi by lazy { DatabackupApi(client = apiClient) }
 
-    suspend fun getSubscriptionDetails(
+    suspend fun fetchSubscriptionDetails(
         ccv2Token: String,
         subscription: CCv2Subscription
-    ): SubscriptionDetailDTO? {
-        return subscriptionApi.getSubscription(
-            subscriptionCode = subscription.id!!,
-            requestHeaders = createRequestParams(ccv2Token)
+    ): CCv2SubscriptionDetailsDto? {
+        return CCv2SubscriptionDetailsDto.map(
+            subscriptionApi.getSubscription(
+                subscriptionCode = subscription.id!!,
+                requestHeaders = createRequestParams(ccv2Token)
+            )
         )
     }
 

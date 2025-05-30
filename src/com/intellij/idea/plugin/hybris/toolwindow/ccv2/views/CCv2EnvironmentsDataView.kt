@@ -21,6 +21,7 @@ package com.intellij.idea.plugin.hybris.toolwindow.ccv2.views
 import com.intellij.ide.HelpTooltip
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.actions.CCv2ShowEnvironmentDetailsAction
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2DeploymentStatusEnum
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
@@ -48,18 +49,32 @@ object CCv2EnvironmentsDataView : AbstractCCv2DataView<CCv2EnvironmentDto>() {
     else panel {
         data.forEach { (subscription, environments) ->
             collapsibleGroup(subscription.toString()) {
-                if (environments.isEmpty()) {
-                    noData()
-                } else {
-                    environments
-                        .sortedWith(compareBy({ it.type }, { it.name }))
-                        .forEach { environment(project, subscription, it, showBuilds) }
+
+                subscription.details?.let { details ->
+                    group("Subscription") {
+                        row {
+                            label("${details.externalCode}-${details.customerCode}").bold().comment("Subscription code")
+                        }
+                        details.customerName?.let { name -> row { label(name).bold().comment("Customer name") } }
+                        details.name?.let { subName -> row { label(subName).bold().comment("Subscription name") } }
+                        details.status?.let { status -> row { label(status).bold().comment("Status") } }
+                        details.regionName?.let { region -> row { label(region).bold().comment("Region name") } }
+                    }
                 }
-            }
-                .expanded = showBuilds
+
+                group("Environments") {
+                    if (environments.isEmpty()) {
+                        noData()
+                    } else {
+                        environments
+                            .sortedWith(compareBy({ it.type }, { it.name }))
+                            .forEach { environment(project, subscription, it, showBuilds) }
+                    }
+                }
+
+            }.expanded = showBuilds
         }
-    }
-        .let { Dsl.scrollPanel(it) }
+    }.let { Dsl.scrollPanel(it) }
 
     private fun Panel.environment(project: Project, subscription: CCv2Subscription, environment: CCv2EnvironmentDto, showBuilds: Boolean = false) {
         row {

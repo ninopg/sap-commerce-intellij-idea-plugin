@@ -17,10 +17,14 @@
  */
 package com.intellij.idea.plugin.hybris.settings
 
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2SubscriptionDetailsDto
 import com.intellij.openapi.components.BaseState
 import java.util.*
 
-class CCv2Subscription : BaseState(), Comparable<CCv2Subscription> {
+class CCv2Subscription(
+    var details: CCv2SubscriptionDetailsDto? = null
+) : BaseState(), Comparable<CCv2Subscription> {
+
     var uuid by string(UUID.randomUUID().toString())
     var id by string()
     var name by string(null)
@@ -39,7 +43,11 @@ data class CCv2SubscriptionDto(
     var id: String? = null,
     var name: String? = null,
     var ccv2Token: String? = null,
-) {
+    var details: CCv2SubscriptionDetailsDto? = null
+) : Comparable<CCv2SubscriptionDto> {
+
+    override fun compareTo(other: CCv2SubscriptionDto) = toString().compareTo(other.toString())
+
     fun toModel() = CCv2Subscription()
         .also {
             it.uuid = uuid

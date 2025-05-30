@@ -20,11 +20,13 @@ package com.intellij.idea.plugin.hybris.toolwindow.ccv2
 
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.tools.ccv2.*
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2BuildDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2DeploymentDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2SubscriptionDetailsDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.toolwindow.HybrisToolWindowFactory
 import com.intellij.idea.plugin.hybris.toolwindow.ccv2.views.CCv2BuildsDataView
@@ -45,6 +47,7 @@ import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.TopGap
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.asSafely
+import com.intellij.util.messages.Topic
 import java.io.Serial
 
 class CCv2View(val project: Project) : SimpleToolWindowPanel(false), Disposable {
@@ -86,22 +89,18 @@ class CCv2View(val project: Project) : SimpleToolWindowPanel(false), Disposable 
                         }
                     }
                 )
-                    .label("Subscription:")
-                    .onChanged {
-                        val devSettings = DeveloperSettingsComponent.getInstance(project).state
-
-                        when (val element = it.selectedItem) {
-                            is CCv2Subscription -> devSettings.activeCCv2SubscriptionID = element.id
-                            else -> devSettings.activeCCv2SubscriptionID = null
-                        }
+                .label("Subscription:")
+                .onChanged {
+                    val devSettings = DeveloperSettingsComponent.getInstance(project).state
+                    when (val element = it.selectedItem) {
+                        is CCv2Subscription -> devSettings.activeCCv2SubscriptionID = element.id
+                        else -> devSettings.activeCCv2SubscriptionID = null
                     }
-            }
-                .topGap(TopGap.SMALL)
-                .bottomGap(BottomGap.SMALL)
+                }
+            }.topGap(TopGap.SMALL).bottomGap(BottomGap.SMALL)
         }
         row {
-            cell(tabbedPane)
-                .align(Align.FILL)
+            cell(tabbedPane).align(Align.FILL)
         }.resizableRow()
     }
 
@@ -123,6 +122,7 @@ class CCv2View(val project: Project) : SimpleToolWindowPanel(false), Disposable 
 
     private fun installDataListeners() {
         with(project.messageBus.connect(this)) {
+
             // Environments data listeners
             subscribe(CCv2Service.TOPIC_ENVIRONMENT, object : CCv2EnvironmentsListener {
                 override fun onFetchingStarted(subscriptions: Collection<CCv2Subscription>) = onFetchingStarted(CCv2Tab.ENVIRONMENTS)

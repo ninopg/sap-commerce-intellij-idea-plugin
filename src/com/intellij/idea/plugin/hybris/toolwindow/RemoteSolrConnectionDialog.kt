@@ -32,8 +32,9 @@ import java.awt.Component
 class RemoteSolrConnectionDialog(
     project: Project,
     parentComponent: Component,
-    settings: RemoteConnectionSettings
-) : AbstractRemoteConnectionDialog(project, parentComponent, settings, "Remote SOLR Instance") {
+    settings: RemoteConnectionSettings,
+    hosts: List<String> = emptyList()
+) : AbstractRemoteConnectionDialog(project, parentComponent, settings, hosts, "Remote SOLR Instance") {
 
     override fun panel() = panel {
         row {

@@ -21,6 +21,7 @@ package com.intellij.idea.plugin.hybris.toolwindow
 import com.intellij.credentialStore.Credentials
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionScope
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.openapi.project.Project
@@ -36,8 +37,9 @@ import javax.swing.DefaultComboBoxModel
 class RemoteHacConnectionDialog(
     project: Project,
     parentComponent: Component,
-    settings: RemoteConnectionSettings
-) : AbstractRemoteConnectionDialog(project, parentComponent, settings, "Remote SAP Commerce Instance") {
+    settings: RemoteConnectionSettings,
+    hosts: List<String> = emptyList()
+) : AbstractRemoteConnectionDialog(project, parentComponent, settings, hosts,"Remote SAP Commerce Instance") {
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
     private lateinit var sessionCookieNameTextField: JBTextField
@@ -201,9 +203,7 @@ class RemoteHacConnectionDialog(
             }.layout(RowLayout.PARENT_GRID)
         }
 
-        hosts.takeIf { it.isNotEmpty() }?.let {
-            hostEditableComboBox.model = DefaultComboBoxModel(it.toTypedArray())
-        }
+        hosts.takeIf { it.isNotEmpty() }?.let { hostEditableComboBox.model = DefaultComboBoxModel(it.toTypedArray()) }
         hostEditableComboBox.selectedItem = settings.hostIP ?: HybrisConstants.DEFAULT_HOST_URL
 
     }
