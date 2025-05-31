@@ -70,6 +70,27 @@ class CCv2Api {
         )
     }
 
+    suspend fun fetchAvailableEnvironments(
+        ccv2Token: String,
+        subscription: CCv2Subscription,
+        progressReporter: ProgressReporter
+    ): Collection<CCv2EnvironmentDto> {
+
+        val subscriptionCode = subscription.id!!
+
+        return progressReporter.sizedStep(1, "Fetching Environments for subscription: $subscription") {
+            environmentApi.getEnvironments(
+                subscriptionCode = subscriptionCode,
+                status = CCv2EnvironmentStatus.AVAILABLE.name,
+                requestHeaders = createRequestParams(ccv2Token)
+            ).value
+                // ?.filter { env -> statuses.isEmpty() || statuses.contains(env.status) }
+                ?.map { env -> CCv2EnvironmentDto.map(env, true, null, null) }
+                ?: emptyList()
+        }
+
+    }
+
     suspend fun fetchEnvironments(
         ccv2Token: String,
         subscription: CCv2Subscription,

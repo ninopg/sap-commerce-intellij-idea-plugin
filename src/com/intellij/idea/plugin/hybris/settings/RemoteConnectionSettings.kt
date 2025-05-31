@@ -53,16 +53,12 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
 
     val username: String
         get() = credentials?.userName
-            ?: PasswordSafe.instance.get(CredentialAttributes("SAP CX - $uuid"))
-                ?.userName
-            ?: if (type == RemoteConnectionType.Hybris) "admin"
-            else "solrserver"
+            ?: PasswordSafe.instance.get(CredentialAttributes("SAP CX - $uuid"))?.userName
+            ?: if (type == RemoteConnectionType.Hybris) "admin" else "solrserver"
     val password: String
         get() = credentials?.getPasswordAsString()
-            ?: PasswordSafe.instance.get(CredentialAttributes("SAP CX - $uuid"))
-                ?.getPasswordAsString()
-            ?: if (type == RemoteConnectionType.Hybris) "nimda"
-            else "server123"
+            ?: PasswordSafe.instance.get(CredentialAttributes("SAP CX - $uuid"))?.getPasswordAsString()
+            ?: if (type == RemoteConnectionType.Hybris) "nimda" else "server123"
 
     val generatedURL: String
         get() {
@@ -78,7 +74,7 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
             .takeIf { it.isNotBlank() }
         ?: super.toString()
         )
-        .let { scope.shortTitle + " : " + it }
+        .let { "${scope.shortTitle} : $it" + (replicaId?.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") }
 
     override fun accepts(accessor: Accessor, bean: Any) = accessor.name != "credentials"
         && accessor.name != "username"

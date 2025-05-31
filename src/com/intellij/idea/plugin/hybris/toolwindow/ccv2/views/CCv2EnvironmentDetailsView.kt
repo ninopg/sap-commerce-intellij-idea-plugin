@@ -209,7 +209,7 @@ class CCv2EnvironmentDetailsView(
                     icon(HybrisIcons.CCv2.Build.REVISION).gap(RightGap.SMALL)
                     copyLink(project, "Revision", build.revision, "Build Revision copied to clipboard")
                 }
-            }.gap(RightGap.SMALL)
+            }.gap(RightGap.COLUMNS)
 
             panel {
                 row {
@@ -237,8 +237,7 @@ class CCv2EnvironmentDetailsView(
                     sUser(project, build.createdBy, HybrisIcons.CCv2.Build.CREATED_BY)
                 }
             }
-        }
-            .layout(RowLayout.PARENT_GRID)
+        }.layout(RowLayout.PARENT_GRID)
     }
 
     private fun servicesPanel(services: Collection<CCv2ServiceDto>) = panel {

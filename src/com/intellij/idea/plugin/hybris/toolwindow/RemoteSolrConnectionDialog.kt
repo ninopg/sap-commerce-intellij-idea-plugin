@@ -34,7 +34,7 @@ class RemoteSolrConnectionDialog(
     parentComponent: Component,
     settings: RemoteConnectionSettings,
     hosts: List<String> = emptyList()
-) : AbstractRemoteConnectionDialog(project, parentComponent, settings, hosts, "Remote SOLR Instance") {
+) : AbstractRemoteConnectionDialog(project, parentComponent, settings,"Remote SOLR Instance") {
 
     override fun panel() = panel {
         row {

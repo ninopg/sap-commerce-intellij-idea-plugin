@@ -18,6 +18,7 @@
 
 package com.intellij.idea.plugin.hybris.toolwindow.ccv2.views
 
+import com.intellij.credentialStore.Credentials
 import com.intellij.ide.HelpTooltip
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
 import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
@@ -44,11 +45,14 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.JBColor
+import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
 import okhttp3.internal.notify
+import java.awt.Component
 import java.awt.GridBagLayout
+import java.awt.event.InputEvent
 import java.io.Serial
 import java.net.SocketTimeoutException
 import javax.swing.JPanel
@@ -247,6 +251,7 @@ class CCv2ServiceDetailsView(
                     .gap(RightGap.COLUMNS)
 
                 panel { ccv2ServiceModifiedTimeRow(service) }
+                    .gap(RightGap.COLUMNS)
 
                 if (service.supportedProperties.contains(CCv2ServiceProperties.GREEN_DEPLOYMENT_SUPPORTED)) {
                     panel {
@@ -291,29 +296,45 @@ class CCv2ServiceDetailsView(
                                 row {
                                     if (listOf("accstorefront", "api", "backoffice", "backgroundprocessing", "solr").any { replica.name.startsWith(it) }) {
                                         link(replica.name) {
-                                            // val subscriptionDetails = CCv2Service.getInstance(project).getSubscriptionDetails(subscription)
+
                                             val settings = RemoteConnectionUtil.createDefaultRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
                                             val serviceName = replica.name.split("-").firstOrNull() ?: replica.name
                                             settings.displayName = "${subscription.name}.${environment.code}.${serviceName}"
                                             settings.port = ""
                                             val webProxy = environment.webProxies.firstOrNull { it.code == "public" }
-                                            environment.services?.firstOrNull{ it.code == "hac_admin" }?.let { hacService ->
-                                                // settings.username = hacService.customerProperties.get("admin")
-                                                // hacService.initialPasswords?.get("admin")?.let { pwd -> settings.password = pwd }
-                                            }
+
                                             settings.hostIP = webProxy?.defaultDnsEntry?.replace(Regex("^\\*"), serviceName) ?: ""
                                             settings.replicaId = replica.name
-                                            val matchingEndpoints =
-                                                environment.endpoints.filter { it.k8sService == serviceName }.sortedBy { it.priority ?: Int.MAX_VALUE }.map { it.domainName }
-                                            RemoteHacConnectionDialog(project, this@CCv2ServiceDetailsView, settings, matchingEndpoints).showAndGet()
-                                        }
-                                            .bold()
-                                            .comment("Name")
-                                            .applyToComponent {
-                                                HelpTooltip()
-                                                    .setTitle("Create a remote connection to the replica")
-                                                    .installOn(this)
+                                            val matchingEndpoints = environment.endpoints
+                                                .filter { it.k8sService == serviceName }
+                                                .sortedBy { it.priority ?: Int.MAX_VALUE }
+                                                .map { it.domainName }
+
+                                            environment.services?.firstOrNull{ it.code == "hcs_admin" }?.let{ hcsAdminService ->
+                                                CCv2Service.getInstance(project).fetchHacInitialPassword(subscription, environment, hcsAdminService)?.let {
+                                                    settings.credentials = Credentials("admin", it)
+                                                }
                                             }
+
+                                            // val environmentComboBoxModel = MutableCollectionComboBoxModel<String>().apply { update(subscription.environments.map{ code}) }
+                                            val hostsComboBoxModel = MutableCollectionComboBoxModel<String>().apply { update(matchingEndpoints) }
+                                            val replicaIdsComboBoxModel = MutableCollectionComboBoxModel<String>().apply { update(replicas.map{ it.name } ) }
+
+                                            if (RemoteHacConnectionDialog(project, this@CCv2ServiceDetailsView, settings,
+                                                    hostsComboBoxModel = hostsComboBoxModel,
+                                                    replicaIdsComboBoxModel = replicaIdsComboBoxModel
+                                                ).showAndGet()) {
+                                                RemoteConnectionUtil.addRemoteConnection(project, settings)
+                                            }
+
+                                        }
+                                        .bold()
+                                        .comment("Name")
+                                        .applyToComponent {
+                                            HelpTooltip()
+                                                .setTitle("Create a remote connection to the replica")
+                                                .installOn(this)
+                                        }
                                     } else {
                                         label(replica.name)
                                             .comment("Name")

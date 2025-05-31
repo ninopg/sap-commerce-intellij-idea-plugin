@@ -20,30 +20,41 @@ package com.intellij.idea.plugin.hybris.toolwindow
 
 import com.intellij.credentialStore.Credentials
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
+import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
-import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionScope
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.EnumComboBoxModel
+import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.selected
 import java.awt.Component
-import javax.swing.DefaultComboBoxModel
+import javax.swing.JComboBox
 
 class RemoteHacConnectionDialog(
     project: Project,
     parentComponent: Component,
     settings: RemoteConnectionSettings,
-    hosts: List<String> = emptyList()
-) : AbstractRemoteConnectionDialog(project, parentComponent, settings, hosts,"Remote SAP Commerce Instance") {
+    environmentsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
+    hostsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
+    replicaIdsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>()
+) : AbstractRemoteConnectionDialog(
+    project, parentComponent, settings, "Remote SAP Commerce Instance",
+    environmentsComboBoxModel = environmentsComboBoxModel,
+    hostsComboBoxModel = hostsComboBoxModel,
+    replicaIdsComboBoxModel = replicaIdsComboBoxModel
+) {
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
     private lateinit var sessionCookieNameTextField: JBTextField
-    private lateinit var replicaIdTextField: JBTextField
+    private lateinit var replicaIdTextField: JComboBox<String>
 
     override fun createTestSettings() = with(RemoteConnectionSettings()) {
         type = settings.type
@@ -54,7 +65,7 @@ class RemoteHacConnectionDialog(
         sslProtocol = sslProtocolComboBox.selectedItem?.toString() ?: ""
         hacWebroot = webrootTextField.text
         sessionCookieName = sessionCookieNameTextField.text.takeIf { !it.isNullOrBlank() } ?: HybrisConstants.DEFAULT_SESSION_COOKIE_NAME
-        replicaId = replicaIdTextField.text.takeIf { !it.isNullOrBlank() } ?: ""
+        replicaId = replicaIdTextField.selectedItem?.toString()?.takeIf { !it.isNullOrBlank() } ?: ""
         credentials = Credentials(usernameTextField.text, String(passwordTextField.password))
         this
     }
@@ -78,8 +89,52 @@ class RemoteHacConnectionDialog(
             comboBox(
                 EnumComboBoxModel(RemoteConnectionScope::class.java),
                 renderer = SimpleListCellRenderer.create("?") { it.title }
-            )
-                .bindItem(settings::scope.toNullableProperty(RemoteConnectionScope.PROJECT_PERSONAL))
+            ).bindItem(settings::scope.toNullableProperty(RemoteConnectionScope.PROJECT_PERSONAL))
+        }.layout(RowLayout.PARENT_GRID)
+
+        row {
+            label("Subscription:").comment("Optional: Select a subscription to use for this connection.")
+            subscriptionComboBox = comboBox(
+                CCv2SubscriptionsComboBoxModelFactory.create(project, allowBlank = true),
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (value != null) {
+                        label.icon = HybrisIcons.Module.CCV2
+                        label.text = value.toString()
+                    } else {
+                        label.text = ""
+                    }
+                }
+            ).onChanged {
+                (subscriptionComboBox.selectedItem as? CCv2Subscription)?.let{selected ->
+                    CCv2Service.getInstance(project).fetchAvailableEnvironments(
+                        selected,
+                        {
+                            environmentComboBox.isEnabled = false
+                        },
+                        { environments ->
+                            environmentsComboBoxModel.update(environments.map{env -> env.code })
+                            if (environments.isNotEmpty()) environmentComboBox.selectedIndex = 0
+                            environmentComboBox.isEnabled = true
+                        }
+                    )
+                } 
+            }.component
+        }.layout(RowLayout.PARENT_GRID)
+
+        row {
+            label("Environment:")
+                .comment("Optional: Select an environment to use for this connection.")
+            environmentComboBox = comboBox(
+                environmentsComboBoxModel,
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (value != null) {
+                        label.icon = HybrisIcons.Module.CCV2
+                        label.text = value
+                    } else {
+                        label.text = ""
+                    }
+                }
+            ).component.apply { isEnabled = false }
         }.layout(RowLayout.PARENT_GRID)
 
         group("Full URL Preview", false) {
@@ -103,8 +158,8 @@ class RemoteHacConnectionDialog(
             row {
                 label("Address:")
                 hostEditableComboBox = comboBox(
-                    listOf("localhost"),
-                    renderer = SimpleListCellRenderer.create("?") { it }
+                    hostsComboBoxModel,
+                    renderer = SimpleListCellRenderer.create("") { it }
                 )
                 .comment("Host name or IP address")
                 .align(AlignX.FILL)
@@ -171,11 +226,14 @@ class RemoteHacConnectionDialog(
 
             row {
                 label("Replica Id:")
-                replicaIdTextField = textField()
-                    .comment("Optional: Target a specific replica.")
-                    .align(AlignX.FILL)
-                    .bindText(settings::replicaId.toNonNullableProperty(""))
-                    .component
+                replicaIdTextField = comboBox(
+                    replicaIdsComboBoxModel,
+                    renderer = SimpleListCellRenderer.create("") { it }
+                )
+                .comment("Optional: Target a specific replica.")
+                .align(AlignX.FILL)
+                .bindItem(settings::replicaId.toNonNullableProperty(""))
+                .component.apply { isEditable = true }
             }.layout(RowLayout.PARENT_GRID)
 
             if (isWindows()) {
@@ -203,7 +261,7 @@ class RemoteHacConnectionDialog(
             }.layout(RowLayout.PARENT_GRID)
         }
 
-        hosts.takeIf { it.isNotEmpty() }?.let { hostEditableComboBox.model = DefaultComboBoxModel(it.toTypedArray()) }
+        // hosts.takeIf { it.isNotEmpty() }?.let { hostEditableComboBox.model = DefaultComboBoxModel(it.toTypedArray()) }
         hostEditableComboBox.selectedItem = settings.hostIP ?: HybrisConstants.DEFAULT_HOST_URL
 
     }

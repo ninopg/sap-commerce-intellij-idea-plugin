@@ -25,6 +25,7 @@ import com.intellij.idea.plugin.hybris.settings.CCv2SubscriptionDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.actions.CCv2ShowEnvironmentDetailsAction
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2DeploymentStatusEnum
 import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.copyLink
 import com.intellij.idea.plugin.hybris.tools.ccv2.ui.dynatrace
 import com.intellij.idea.plugin.hybris.toolwindow.ccv2.CCv2Tab
 import com.intellij.idea.plugin.hybris.toolwindow.ccv2.CCv2ViewUtil
@@ -53,12 +54,36 @@ object CCv2EnvironmentsDataView : AbstractCCv2DataView<CCv2EnvironmentDto>() {
                 subscription.details?.let { details ->
                     group("Subscription") {
                         row {
-                            label("${details.externalCode}-${details.customerCode}").bold().comment("Subscription code")
+                            panel {
+                                row {
+                                    copyLink(project, "Subscription code", "${details.customerCode}-${details.externalCode}", "Subscription code copied to clipboard")
+                                }
+                            }.gap(RightGap.COLUMNS)
+
+                            panel {
+                                row {
+                                    label(details.customerName ?: "-").bold().comment("Customer name")
+                                }
+                            }.gap(RightGap.COLUMNS)
+
+                            panel {
+                                row {
+                                    label(details.name ?: "-").bold().comment("Subscription name")
+                                }
+                            }.gap(RightGap.COLUMNS)
+
+                            panel {
+                                row {
+                                    label(details.status ?: "-").bold().comment("Status")
+                                }
+                            }.gap(RightGap.COLUMNS)
+
+                            panel {
+                                row {
+                                    label(details.regionName ?: "-").bold().comment("Azure region")
+                                }
+                            }
                         }
-                        details.customerName?.let { name -> row { label(name).bold().comment("Customer name") } }
-                        details.name?.let { subName -> row { label(subName).bold().comment("Subscription name") } }
-                        details.status?.let { status -> row { label(status).bold().comment("Status") } }
-                        details.regionName?.let { region -> row { label(region).bold().comment("Region name") } }
                     }
                 }
 
@@ -128,7 +153,7 @@ object CCv2EnvironmentsDataView : AbstractCCv2DataView<CCv2EnvironmentDto>() {
                 row {
                     dynatrace(environment)
                 }
-            }.gap(RightGap.SMALL)
+            }.gap(RightGap.COLUMNS)
 
             panel {
                 row {
