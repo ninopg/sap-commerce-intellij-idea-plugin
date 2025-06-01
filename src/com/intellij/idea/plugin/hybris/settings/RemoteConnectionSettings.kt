@@ -22,6 +22,7 @@ import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import com.intellij.idea.plugin.hybris.settings.components.ApplicationSettingsComponent
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionScope
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
@@ -40,6 +41,9 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
     var displayName by string(null)
     var scope by property(RemoteConnectionScope.PROJECT_PERSONAL) { false }
     var type by property(RemoteConnectionType.Hybris) { false }
+    var subscription by string(null)
+    var environment by string(null)
+    var service by string(null)
     var hostIP by string(HybrisConstants.DEFAULT_HOST_URL)
     var port by string(null)
     var isSsl by property(true)
@@ -70,11 +74,14 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
 
     override fun toString() = (displayName
         ?.takeIf { it.isNotBlank() }
-        ?: generatedURL
-            .takeIf { it.isNotBlank() }
+        ?: listOf(safeLookup(subscription), environment, service).filter { !it.isNullOrBlank() }.joinToString(".").takeIf { it.isNotBlank() }
+        ?: generatedURL.takeIf { it.isNotBlank() }
         ?: super.toString()
         )
         .let { "${scope.shortTitle} : $it" + (replicaId?.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") }
+
+    private fun safeLookup(subscriptionUUID: String?) =
+        subscriptionUUID?.let { ApplicationSettingsComponent.getInstance().state.ccv2Subscriptions.find { it.uuid == subscriptionUUID }?.name}
 
     override fun accepts(accessor: Accessor, bean: Any) = accessor.name != "credentials"
         && accessor.name != "username"

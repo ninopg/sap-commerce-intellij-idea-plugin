@@ -147,7 +147,7 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
                         getCCv2Token(subscription)?.let { ccv2Token ->
                             try {
                                 val ccv2Settings = DeveloperSettingsComponent.getInstance(project).state.ccv2Settings
-                                val statuses = ccv2Settings.showEnvironmentStatuses.map { it.name }
+                                // val statuses = ccv2Settings.showEnvironmentStatuses.map { it.name }
                                 return@let CCv2Api.getInstance().fetchAvailableEnvironments(ccv2Token, subscription, progressReporter)
                             } catch (e: SocketTimeoutException) {
                                 notifyOnTimeout(subscription)
@@ -243,6 +243,32 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
         }
     }
 
+    fun fetchEnvironmentServices(
+        subscription: CCv2Subscription,
+        environmentCode: String,
+        onStartCallback: () -> Unit,
+        onCompleteCallback: (Collection<CCv2ServiceDto>?) -> Unit
+    ) {
+        onStartCallback.invoke()
+
+        coroutineScope.launch {
+            withBackgroundProgress(project, "Fetching CCv2 Environment Services...", true) {
+                val ccv2Token = getCCv2Token(subscription) ?: return@withBackgroundProgress
+                var services: Collection<CCv2ServiceDto>? = null
+
+                try {
+                    services = CCv1Api.getInstance().fetchEnvironmentServices(ccv2Token, subscription, environmentCode)
+                } catch (e: SocketTimeoutException) {
+                    notifyOnTimeout(subscription)
+                } catch (e: RuntimeException) {
+                    notifyOnException(subscription, e)
+                }
+
+                onCompleteCallback.invoke(services)
+            }
+        }
+    }
+
     fun fetchEnvironmentDataBackups(
         subscription: CCv2Subscription,
         environment: CCv2EnvironmentDto,
@@ -294,6 +320,34 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
                 }
 
                 onCompleteCallback.invoke(properties)
+            }
+        }
+    }
+
+    fun fetchEnvironment(
+        subscription: CCv2Subscription,
+        environmentCode: String,
+        onStartCallback: () -> Unit,
+        onCompleteCallback: (CCv2EnvironmentDto?) -> Unit
+    ) {
+        onStartCallback.invoke()
+        var environment: CCv2EnvironmentDto?
+        coroutineScope.launch {
+            withBackgroundProgress(project, "Fetching CCv2 Environment Endpoints...", true) {
+                reportProgress(1) { progressReporter ->
+
+                    getCCv2Token(subscription)?.let {
+                        try {
+                            environment = CCv2Api.getInstance().fetchEnvironment(it, subscription, environmentCode, progressReporter)
+                            onCompleteCallback.invoke(environment)
+                        } catch (e: SocketTimeoutException) {
+                            notifyOnTimeout(subscription)
+                        } catch (e: RuntimeException) {
+                            notifyOnException(subscription, e)
+                        }
+                    }
+
+                }
             }
         }
     }

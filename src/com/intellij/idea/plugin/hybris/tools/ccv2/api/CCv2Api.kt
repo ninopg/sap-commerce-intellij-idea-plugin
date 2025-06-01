@@ -26,6 +26,7 @@ import com.intellij.idea.plugin.hybris.ccv2.invoker.infrastructure.ApiClient
 import com.intellij.idea.plugin.hybris.ccv2.model.CreateBuildRequestDTO
 import com.intellij.idea.plugin.hybris.ccv2.model.CreateDeploymentRequestDTO
 import com.intellij.idea.plugin.hybris.ccv2.model.DeploymentDetailDTO
+import com.intellij.idea.plugin.hybris.ccv2.model.EndpointDetailDTO
 import com.intellij.idea.plugin.hybris.ccv2.model.EnvironmentDetailDTO
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
@@ -56,6 +57,7 @@ class CCv2Api {
     private val deploymentApi by lazy { DeploymentApi(client = apiClient) }
     private val buildApi by lazy { BuildApi(client = apiClient) }
     private val servicePropertiesApi by lazy { ServicePropertiesApi(client = apiClient) }
+    private val endPointApi by lazy { EndpointApi(client = apiClient) }
     private val databackupApi by lazy { DatabackupApi(client = apiClient) }
 
     suspend fun fetchSubscriptionDetails(
@@ -137,6 +139,19 @@ class CCv2Api {
                     CCv2EnvironmentDto.map(environment, details.first, details.second, details.third)
                 }
                 ?: emptyList()
+        }
+    }
+
+    suspend fun fetchEnvironment(
+        ccv2Token: String,
+        subscription: CCv2Subscription,
+        environmentCode: String,
+        progressReporter: ProgressReporter
+    ): CCv2EnvironmentDto? {
+        val ccv1Api = CCv1Api.getInstance()
+        return progressReporter.sizedStep(1, "Fetching Environments for subscription: $subscription") {
+            val env = EnvironmentDetailDTO(subscriptionCode = subscription.id, code = environmentCode)
+            getV1Environment(true, ccv1Api, ccv2Token, env)?.let{CCv2EnvironmentDto.map(env, true, it, null)}
         }
     }
 

@@ -124,6 +124,18 @@ class CCv1Api {
         )
         .map { CCv2ServiceDto.map(subscription, environment, it) }
 
+    suspend fun fetchEnvironmentServices(
+        accessToken: String,
+        subscription: CCv2Subscription,
+        environmentCode: String
+    ): Collection<CCv2ServiceDto> = environmentApi
+        .getEnvironmentServices(
+            subscriptionCode = subscription.id!!,
+            environmentCode = environmentCode,
+            requestHeaders = createRequestParams(accessToken)
+        )
+        .map { CCv2ServiceDto.map(subscription, environmentCode, it) }
+
     suspend fun restartServiceReplica(
         accessToken: String,
         subscription: CCv2Subscription,

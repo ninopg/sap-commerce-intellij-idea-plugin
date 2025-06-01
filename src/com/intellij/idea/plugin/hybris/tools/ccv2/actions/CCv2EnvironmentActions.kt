@@ -18,6 +18,7 @@
 
 package com.intellij.idea.plugin.hybris.tools.ccv2.actions
 
+import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.notifications.Notifications
 import com.intellij.idea.plugin.hybris.settings.CCv2Settings

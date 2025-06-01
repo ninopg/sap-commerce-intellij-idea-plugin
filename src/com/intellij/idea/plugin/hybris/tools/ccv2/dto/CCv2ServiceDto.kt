@@ -56,8 +56,24 @@ data class CCv2ServiceDto(
             link = "https://${HybrisConstants.CCV2_DOMAIN}/subscription/${subscription.id!!}/applications/commerce-cloud/environments/${environment.code}/services/${dto.code}/replicas",
             replicas = dto.replicas
                 ?.map { CCv2ServiceReplicaDto.map(it) }
+                ?: emptyList(),
+        )
+
+        fun map(subscription: CCv2Subscription, environmentCode: String, dto: ServiceDTO) = CCv2ServiceDto(
+            code = dto.code,
+            name = dto.name,
+            modifiedBy = dto.modifiedBy,
+            modifiedTime = dto.modifiedTime,
+            customerScalableSupported = dto.customerScalableSupported,
+            runnable = dto.runnable,
+            desiredReplicas = dto.desiredReplicas,
+            availableReplicas = dto.availableReplicas,
+            link = "https://${HybrisConstants.CCV2_DOMAIN}/subscription/${subscription.id!!}/applications/commerce-cloud/environments/${environmentCode}/services/${dto.code}/replicas",
+            replicas = dto.replicas
+                ?.map { CCv2ServiceReplicaDto.map(it) }
                 ?: emptyList()
         )
+
     }
 }
 

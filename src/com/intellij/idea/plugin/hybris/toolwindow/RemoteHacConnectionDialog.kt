@@ -18,26 +18,77 @@
 
 package com.intellij.idea.plugin.hybris.toolwindow
 
+import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
+import com.intellij.database.util.common.isNotNullOrEmpty
+import com.intellij.icons.AllIcons
+import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
 import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
-import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionScope
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.EnumComboBoxModel
 import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.dialog
 import com.intellij.ui.dsl.builder.*
+import com.intellij.ui.layout.ComboBoxPredicate
 import com.intellij.ui.layout.selected
+import org.jetbrains.annotations.NotNull
 import java.awt.Component
 import javax.swing.JComboBox
 
+class ReloadEnvironmentsAction(val subscriptionComboBox: JComboBox<CCv2Subscription>, val dialog: RemoteHacConnectionDialog) :
+    AnAction(
+        "Reload Environments",
+        "Reloads environments for the selected) subscription",
+        AllIcons.General.Refresh) {
+    override fun actionPerformed(e: AnActionEvent) {
+        if (subscriptionComboBox.selectedItem != null) {
+            dialog.updateEnvironmentsComboBox()
+            dialog.updateHostsComboBox()
+            dialog.updateReplicaIdsComboBox()
+            dialog.updateCredentials()
+        }
+    }
+
+    override fun update(@NotNull e: AnActionEvent) {
+        e.presentation.setEnabled(subscriptionComboBox.selectedItem != null)
+    }
+
+}
+
+class ShowPasswordAction (val passwordTextField: JBPasswordField) :
+    ToggleAction(
+        "Show Password",
+        "Toggle password visibility",
+        AllIcons.General.Show) {
+    override fun isSelected(e: AnActionEvent): Boolean = passwordTextField.echoChar == 0.toChar()
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        if (!isSelected(e)) {
+            passwordTextField.setEchoChar(0.toChar())
+        } else {
+            passwordTextField.setEchoChar('*')
+        }
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+}
+
+// REVIEWME: all the logic to init, update needs to be reviewed
 class RemoteHacConnectionDialog(
     project: Project,
     parentComponent: Component,
@@ -54,7 +105,6 @@ class RemoteHacConnectionDialog(
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
     private lateinit var sessionCookieNameTextField: JBTextField
-    private lateinit var replicaIdTextField: JComboBox<String>
 
     override fun createTestSettings() = with(RemoteConnectionSettings()) {
         type = settings.type
@@ -65,7 +115,7 @@ class RemoteHacConnectionDialog(
         sslProtocol = sslProtocolComboBox.selectedItem?.toString() ?: ""
         hacWebroot = webrootTextField.text
         sessionCookieName = sessionCookieNameTextField.text.takeIf { !it.isNullOrBlank() } ?: HybrisConstants.DEFAULT_SESSION_COOKIE_NAME
-        replicaId = replicaIdTextField.selectedItem?.toString()?.takeIf { !it.isNullOrBlank() } ?: ""
+        replicaId = replicaIdComboBox.selectedItem?.toString()?.takeIf { !it.isNullOrBlank() } ?: ""
         credentials = Credentials(usernameTextField.text, String(passwordTextField.password))
         this
     }
@@ -89,13 +139,15 @@ class RemoteHacConnectionDialog(
             comboBox(
                 EnumComboBoxModel(RemoteConnectionScope::class.java),
                 renderer = SimpleListCellRenderer.create("?") { it.title }
-            ).bindItem(settings::scope.toNullableProperty(RemoteConnectionScope.PROJECT_PERSONAL))
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(settings::scope.toNullableProperty(RemoteConnectionScope.PROJECT_PERSONAL))
         }.layout(RowLayout.PARENT_GRID)
 
         row {
             label("Subscription:").comment("Optional: Select a subscription to use for this connection.")
             subscriptionComboBox = comboBox(
-                CCv2SubscriptionsComboBoxModelFactory.create(project, allowBlank = true),
+                subscriptionsComboBoxModel,
                 renderer = SimpleListCellRenderer.create { label, value, _ ->
                     if (value != null) {
                         label.icon = HybrisIcons.Module.CCV2
@@ -104,22 +156,29 @@ class RemoteHacConnectionDialog(
                         label.text = ""
                     }
                 }
-            ).onChanged {
-                (subscriptionComboBox.selectedItem as? CCv2Subscription)?.let{selected ->
-                    CCv2Service.getInstance(project).fetchAvailableEnvironments(
-                        selected,
-                        {
-                            environmentComboBox.isEnabled = false
-                        },
-                        { environments ->
-                            environmentsComboBoxModel.update(environments.map{env -> env.code })
-                            if (environments.isNotEmpty()) environmentComboBox.selectedIndex = 0
-                            environmentComboBox.isEnabled = true
-                        }
-                    )
-                } 
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(
+                getter = { ->
+                    (0 until subscriptionsComboBoxModel.size ).asSequence()
+                        .map { subscriptionsComboBoxModel.getElementAt(it)}
+                        .firstOrNull { it?.uuid == settings.subscription }
+                 },
+                setter = { selected -> settings.subscription = selected?.uuid }
+            )
+            .onChanged {
+                updateEnvironmentsComboBox()
+                updatePortTextField()
+                updateCredentials()
             }.component
+            actionButton(ReloadEnvironmentsAction(subscriptionComboBox, this@RemoteHacConnectionDialog)).enabledIf(
+                ComboBoxPredicate(subscriptionComboBox, { it != null })
+            )
         }.layout(RowLayout.PARENT_GRID)
+
+        if (settings.subscription?.isNotEmpty() ?: false && settings.environment?.isNotEmpty() ?: false && environmentsComboBoxModel.isEmpty) {
+            environmentsComboBoxModel.update(listOf(settings.environment))
+        }
 
         row {
             label("Environment:")
@@ -129,12 +188,45 @@ class RemoteHacConnectionDialog(
                 renderer = SimpleListCellRenderer.create { label, value, _ ->
                     if (value != null) {
                         label.icon = HybrisIcons.Module.CCV2
+                        label.text = "${subscriptionComboBox.selectedItem}.${value}"
+                    } else {
+                        label.text = ""
+                    }
+                }
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(settings::environment.toNullableProperty(defaultValue = ""))
+            .enabledIf(ComboBoxPredicate(subscriptionComboBox, { it != null }))
+            .onChanged {
+                updateHostsComboBox()
+                updateReplicaIdsComboBox()
+                updateCredentials()
+            }
+            .component
+        }.layout(RowLayout.PARENT_GRID)
+
+        row {
+            label("Service:")
+                .comment("Optional: Select a service to use for this connection.")
+            serviceComboBox = comboBox(
+                listOf("") + commerceServices,
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (value?.isNotBlank() ?: false) {
+                        label.icon = AllIcons.Nodes.Services
                         label.text = value
                     } else {
                         label.text = ""
                     }
                 }
-            ).component.apply { isEnabled = false }
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(settings::service.toNullableProperty(defaultValue = ""))
+            .enabledIf(ComboBoxPredicate(environmentComboBox, { it.isNotNullOrEmpty }))
+            .onChanged {
+                updateHostsComboBox()
+                updateReplicaIdsComboBox()
+            }
+            .component
         }.layout(RowLayout.PARENT_GRID)
 
         group("Full URL Preview", false) {
@@ -168,6 +260,9 @@ class RemoteHacConnectionDialog(
                 .addValidationRule("Address cannot be blank.") { it.selectedItem?.toString().isNullOrBlank() }
                 .component.apply {
                     isEditable = true
+                    // if (settings.hostIP?.isNotBlank() == true) {
+                    //    selectedItem = settings.hostIP
+                    // }
                 }
             }.layout(RowLayout.PARENT_GRID)
 
@@ -226,14 +321,24 @@ class RemoteHacConnectionDialog(
 
             row {
                 label("Replica Id:")
-                replicaIdTextField = comboBox(
+                replicaIdComboBox = comboBox(
                     replicaIdsComboBoxModel,
                     renderer = SimpleListCellRenderer.create("") { it }
                 )
                 .comment("Optional: Target a specific replica.")
                 .align(AlignX.FILL)
-                .bindItem(settings::replicaId.toNonNullableProperty(""))
-                .component.apply { isEditable = true }
+                .bindItem(
+                    getter = { ->
+                        settings.replicaId ?: ""
+                    },
+                    setter = { selected -> settings.replicaId = (selected?.toString() ?: "") }
+                )
+                .component.apply {
+                    isEditable = true
+                    if (settings.replicaId?.isNotBlank() == true) {
+                        selectedItem = settings.replicaId
+                    }
+                }
             }.layout(RowLayout.PARENT_GRID)
 
             if (isWindows()) {
@@ -245,7 +350,7 @@ class RemoteHacConnectionDialog(
             row {
                 label("Username:")
                 usernameTextField = textField()
-                    .align(AlignX.FILL)
+                    //.widthGroup("credentials")
                     .enabled(false)
                     .addValidationRule("Username cannot be blank.") { it.text.isNullOrBlank() }
                     .component
@@ -254,15 +359,151 @@ class RemoteHacConnectionDialog(
             row {
                 label("Password:")
                 passwordTextField = passwordField()
+                    //.widthGroup("credentials")
                     .align(AlignX.FILL)
                     .enabled(false)
                     .addValidationRule("Password cannot be blank.") { it.password.isEmpty() }
                     .component
+                actionButton(ShowPasswordAction(passwordTextField))
             }.layout(RowLayout.PARENT_GRID)
         }
 
-        // hosts.takeIf { it.isNotEmpty() }?.let { hostEditableComboBox.model = DefaultComboBoxModel(it.toTypedArray()) }
+        subscriptionComboBox.addItemListener { e ->
+            e.stateChange
+            if (subscriptionComboBox.selectedItem == null) {
+                environmentComboBox.selectedItem = ""
+                environmentComboBox.isEnabled = false
+            }
+        }
         hostEditableComboBox.selectedItem = settings.hostIP ?: HybrisConstants.DEFAULT_HOST_URL
 
     }
+
+    fun diableOtherComboBoxes(comboBox: JComboBox<*>) {
+        // subscriptionComboBox.isEnabled = (subscriptionComboBox == comboBox)
+        // environmentComboBox.isEnabled = (environmentComboBox == comboBox)
+        // serviceComboBox.isEnabled = (serviceComboBox == comboBox)
+        // hostEditableComboBox.isEditable = (hostEditableComboBox == comboBox)
+        // replicaIdComboBox.isEditable = (replicaIdComboBox == comboBox)
+    }
+
+    fun enableAll(comboBox: JComboBox<*>) {
+        // subscriptionComboBox.isEnabled = true
+        // environmentComboBox.isEnabled = true
+        // serviceComboBox.isEnabled = true
+        // hostEditableComboBox.isEditable = true
+        // replicaIdComboBox.isEditable = true
+    }
+
+    fun updateEnvironmentsComboBox() {
+        if (subscriptionComboBox.selectedItem != null) {
+            CCv2Service.getInstance(project).fetchAvailableEnvironments(
+                subscriptionComboBox.selectedItem as CCv2Subscription,
+                {
+                    diableOtherComboBoxes(subscriptionComboBox)
+                },
+                { environments ->
+                    environmentsComboBoxModel.update(with(Regex("""([dsp])(\d+)""")) {
+                        environments.map { it.code }
+                            .sortedWith(compareBy(
+                                { code -> if (matchEntire(code) != null) 0 else 1 },
+                                { code -> matchEntire(code)?.groupValues?.get(1)?.let { when (it) { "d" -> 0; "s" -> 1; "p" -> 2; else -> 3 } } ?: 3 },
+                                { code -> matchEntire(code)?.groupValues?.get(2)?.toIntOrNull() ?: Int.MAX_VALUE },
+                                { code -> code }
+                            ))
+                    }
+                    )
+                    if (environments.isNotEmpty()) environmentComboBox.selectedIndex = 0
+                    enableAll(subscriptionComboBox)
+                }
+            )
+        } else {
+            environmentComboBox.selectedItem = ""
+        }
+    }
+
+    fun updateHostsComboBox() {
+        subscriptionComboBox.selectedItem?.let{ sub ->
+            if (environmentComboBox.selectedItem?.toString()?.isNotBlank() ?: false) {
+                CCv2Service.getInstance(project).fetchEnvironment(
+                    subscriptionComboBox.selectedItem as CCv2Subscription,
+                    environmentComboBox.selectedItem?.toString()!!,
+                    {
+                        diableOtherComboBoxes(environmentComboBox)
+                    },
+                    { service ->
+                        val endpoints = (
+                            if (serviceComboBox.selectedItem?.toString()?.isNotBlank() == true)
+                                service?.endpoints?.filter{ ep -> ep.k8sService == serviceComboBox.selectedItem?.toString() }
+                            else
+                                service?.endpoints?.filter{ ep -> commerceServices.contains(ep.k8sService.lowercase()) }
+                            ) ?: emptyList()
+                        val hostNames = endpoints.map { ep -> ep.domainName }.toMutableList()
+                        service?.webProxies?.firstOrNull { proxy -> proxy.code == "public" }?.let{ webProxy ->
+                            serviceComboBox.selectedItem?.toString()?.let { service ->
+                                webProxy.defaultDnsEntry?.let { defaultDnsEntry ->
+                                    val defaultHost = if (serviceComboBox.selectedItem?.toString()?.isNotEmpty() == true) defaultDnsEntry.replace(Regex("^\\*"), service) else defaultDnsEntry
+                                    if (!hostNames.contains(defaultHost)) {
+                                        hostNames.add(0,defaultDnsEntry)
+                                    }
+                                }
+                            }
+                        }
+                        hostsComboBoxModel.update(hostNames)
+                        enableAll(environmentComboBox)
+                    }
+                )
+            }
+        }
+    }
+
+    fun updateReplicaIdsComboBox() {
+        subscriptionComboBox.selectedItem?.let {subscription ->
+            environmentComboBox.selectedItem?.let {environmentCode ->
+                CCv2Service.getInstance(project).fetchEnvironmentServices(
+                    subscription as CCv2Subscription,
+                    environmentCode.toString(),
+                    {
+                        diableOtherComboBoxes(serviceComboBox)
+                    },
+                    { services ->
+                        val matchingServices = (
+                            if (serviceComboBox.selectedItem?.toString()?.isNotBlank() == true)
+                                services?.firstOrNull{s -> s.code.lowercase() == "hcs_platform_${serviceComboBox.selectedItem}" }?.replicas
+                            else
+                                services?.filter{ s -> s.code.startsWith("hcs_platform_")}?.flatMap{ it.replicas }
+                            ) ?: emptyList()
+                        replicaIdsComboBoxModel.update(matchingServices.map { r -> r.name })
+                        enableAll(serviceComboBox)
+                    }
+                )
+            }
+        }
+    }
+
+    fun updateCredentials() {
+        var credentials: Credentials? = null
+        subscriptionComboBox.selectedItem?.let { subscription ->
+            val subscriptionName = (subscription as CCv2Subscription).name
+            environmentComboBox.selectedItem?.let { environmentCode ->
+                credentials = PasswordSafe.instance.get(CredentialAttributes("ccv2.hac.${subscriptionName}.${environmentCode}"))
+            }
+            credentials = credentials ?: PasswordSafe.instance.get(CredentialAttributes("ccv2.hac.${subscriptionName}"))
+        }
+        credentials?.let{
+            usernameTextField.text = it.userName
+            passwordTextField.text = it.password.toString()
+        }
+    }
+
+    fun updatePortTextField() {
+        subscriptionComboBox.selectedItem?.let {subscription ->
+            portTextField.text = ""
+        }
+    }
+
+    companion object {
+        val commerceServices = listOf("accstorefront", "api", "backoffice", "backgroundprocessing")
+    }
+
 }

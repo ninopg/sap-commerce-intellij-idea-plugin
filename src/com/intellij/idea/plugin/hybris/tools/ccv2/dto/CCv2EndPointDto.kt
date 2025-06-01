@@ -19,6 +19,7 @@
 package com.intellij.idea.plugin.hybris.tools.ccv2.dto
 
 import com.intellij.idea.plugin.hybris.ccv1.model.EndPointDTO
+import com.intellij.idea.plugin.hybris.ccv2.model.EndpointDetailDTO
 
 // REVIEWME
 data class CCv2EndPointDto(

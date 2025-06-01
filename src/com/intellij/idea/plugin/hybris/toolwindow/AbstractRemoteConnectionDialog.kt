@@ -23,10 +23,10 @@ import com.intellij.credentialStore.Credentials
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.ide.passwordSafe.PasswordSafe
-import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings
-import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModel
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
@@ -59,6 +59,7 @@ abstract class AbstractRemoteConnectionDialog(
     parentComponent: Component,
     protected val settings: RemoteConnectionSettings,
     dialogTitle: String,
+    protected val subscriptionsComboBoxModel: CCv2SubscriptionsComboBoxModel = CCv2SubscriptionsComboBoxModelFactory.create(project, allowBlank = true),
     protected val environmentsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
     protected val hostsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
     protected val replicaIdsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>()
@@ -67,11 +68,13 @@ abstract class AbstractRemoteConnectionDialog(
     protected lateinit var connectionNameTextField: JBTextField
     protected lateinit var subscriptionComboBox: JComboBox<CCv2Subscription>
     protected lateinit var environmentComboBox: JComboBox<String>
+    protected lateinit var serviceComboBox: JComboBox<String>
     protected lateinit var urlPreviewLabel: JLabel
     protected lateinit var hostEditableComboBox: JComboBox<String>
     protected lateinit var portTextField: JBTextField
     protected lateinit var sslProtocolCheckBox: JBCheckBox
     protected lateinit var webrootTextField: JBTextField
+    protected lateinit var replicaIdComboBox: JComboBox<String>
     protected lateinit var usernameTextField: JBTextField
     protected lateinit var passwordTextField: JBPasswordField
     protected lateinit var testConnectionLabel: Cell<JLabel>
