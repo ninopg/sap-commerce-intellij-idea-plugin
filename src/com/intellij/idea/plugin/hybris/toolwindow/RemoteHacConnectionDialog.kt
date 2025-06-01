@@ -186,7 +186,7 @@ class RemoteHacConnectionDialog(
             environmentComboBox = comboBox(
                 environmentsComboBoxModel,
                 renderer = SimpleListCellRenderer.create { label, value, _ ->
-                    if (value != null) {
+                    if (subscriptionComboBox.selectedItem != null && value != null) {
                         label.icon = HybrisIcons.Module.CCV2
                         label.text = "${subscriptionComboBox.selectedItem}.${value}"
                     } else {
@@ -418,6 +418,7 @@ class RemoteHacConnectionDialog(
                 }
             )
         } else {
+            settings.environment = ""
             environmentComboBox.selectedItem = ""
         }
     }
