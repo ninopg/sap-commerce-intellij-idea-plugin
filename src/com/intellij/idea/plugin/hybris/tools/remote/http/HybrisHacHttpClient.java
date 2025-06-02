@@ -21,6 +21,7 @@ package com.intellij.idea.plugin.hybris.tools.remote.http;
 
 import com.google.gson.Gson;
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings;
+import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent;
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType;
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil;
 import com.intellij.idea.plugin.hybris.tools.remote.http.flexibleSearch.TableBuilder;
@@ -263,11 +264,42 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
         if (json.get("stacktraceText") != null && isNotEmpty(json.get("stacktraceText").toString())) {
             return createResult().errorMessage(json.get("stacktraceText").toString()).build();
         }
+
         if (json.get("outputText") != null) {
             resultBuilder.output(json.get("outputText").toString());
         }
+
         if (json.get("executionResult") != null) {
-            resultBuilder.result(json.get("executionResult").toString());
+
+            final var result = json.get("executionResult").toString();
+
+            final var groovySettings = DeveloperSettingsComponent.getInstance(project).getState().getGroovySettings();
+
+            if (groovySettings.getDisableScriptTemplate()) {
+                resultBuilder.result(result);
+            } else {
+
+                try {
+
+                    final var nestedJson = new Gson().fromJson(result, HashMap.class);
+
+                    resultBuilder.result(nestedJson.get("executionResult").toString());
+
+                    if (nestedJson.get("outputText") != null && isNotEmpty(nestedJson.get("outputText").toString())) {
+                        resultBuilder.output(nestedJson.get("outputText").toString() + '\n' + json.get("outputText").toString());
+                    }
+
+                    // TODO: actually I want to see the output even in case of error
+                    if (nestedJson.get("stacktraceText") != null && isNotEmpty(nestedJson.get("stacktraceText").toString())) {
+                        return createResult().errorMessage(nestedJson.get("stacktraceText").toString()).build();
+                    }
+
+                } catch (RuntimeException e) {
+                    resultBuilder.result(result);
+                }
+
+            }
+
         }
 
         resultBuilder.route(getRouteCookie(settings));

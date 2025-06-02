@@ -1,21 +1,3 @@
-/*
- * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
 package ghac
 
 import com.sun.management.ThreadMXBean
@@ -35,9 +17,11 @@ import org.springframework.web.servlet.FrameworkServlet
 
 import javax.script.Compilable
 import java.lang.management.ManagementFactory
+import java.nio.charset.StandardCharsets
 
 import static de.hybris.platform.hac.scripting.impl.DefaultScriptingLanguageExecutor.*
 
+// REVIEWME: check wirh root context = ''
 static Map<String,WebApplicationContext> getSpringWeb() {
     Map<String,WebApplicationContext> map = [:]
     def server = Bootstrap.daemon.catalinaDaemon.server
@@ -61,11 +45,11 @@ static Map<String,WebApplicationContext> getSpringWeb() {
                             springContextKey = [attributeName - FrameworkServlet.SERVLET_CONTEXT_PREFIX]
                         }
                         // println "context: ${(contextKey + springContextKey).join('/')} -> ${context.servletContext.getAttribute(attributeName)}"
-                        map << [((contextKey + springContextKey).join('/')):context.servletContext.getAttribute(attributeName)]
+                        map << [('/' + (contextKey + springContextKey).join('/')):context.servletContext.getAttribute(attributeName)]
                     }
                 } else if (rootWebContext) {
                     //println "context: ${contextKey.join('/')} -> ${rootWebContext}"
-                    map << [(contextKey.join('/')):rootWebContext]
+                    map << [('/' + contextKey.join('/')):rootWebContext]
                 }
             }
         }
@@ -89,7 +73,7 @@ String toString(obj) {
 
 }
 
-static String abbreviate(String s, maxLength = 100) {
+static String abbreviate(String s, maxLength = 500) {
     if (!s) return s
     s.length() > maxLength ? s.take(maxLength) + '...' : s
 }
@@ -98,20 +82,20 @@ def toStringConverter = {it -> toString(it)}
 def abbreviatedToStringConverter = {it -> abbreviate(toString(toString(it)))}
 
 def jsonGeneratorOptions = new JsonGenerator.Options()
-// java
+        // java
         .addConverter(java.lang.Class, {it.name})
         .addConverter(org.springframework.beans.factory.BeanFactory, abbreviatedToStringConverter)
         .addConverter(org.springframework.context.ApplicationContext, abbreviatedToStringConverter)
-// aop
+        // aop
         .addConverter(org.springframework.aop.Advisor, toStringConverter)
         .addConverter(org.springframework.aop.TargetSource, toStringConverter)
         .addConverter(org.springframework.cglib.proxy.Callback, toStringConverter)
-// hybris
+        // hybris
         .addConverter(de.hybris.platform.core.Tenant, {it.toString()})
         .addConverter(de.hybris.platform.servicelayer.internal.service.AbstractService, toStringConverter)
         .addConverter(de.hybris.platform.core.model.ItemModel, toStringConverter)
         .addConverter(de.hybris.platform.servicelayer.internal.converter.ModelConverter, toStringConverter)
-// exclude nulls
+        // exclude nulls
         .excludeNulls()
 
 def jsonGenerator = new DefaultJsonGenerator(jsonGeneratorOptions) {
@@ -174,40 +158,35 @@ try {
     ScriptExecutionResult scriptExecutionResult
     def stackTraceText
 
-    // def decodedScript = new String(Base64.decoder.decode('$hacEncodedScript'), UTF_8)
-    def decodedScript = 'println defaultWSCacheManager'
+    def decodedScript = new String(Base64.decoder.decode('$hacEncodedScript'), StandardCharsets.UTF_8)
 
     try {
 
-        springWeb.keySet().each{
-            println it
-        }
+        springWeb.keySet().each{println it}
 
         def scriptContent = new SimpleScriptContent('groovy', decodedScript)
-        scriptingLanguagesService.with {
 
-            // A.
-            // def scriptExecutable = getExecutableByContent(new SimpleScriptContent('groovy', decodedScript))
+        def hacSpringWebContext = '$hacSpringWebContext'
 
-            // B.
-            def engine = getEngine(scriptContent.engineName) as Compilable
-            // def scriptBody = precompileOrGetRaw(getEngine(scriptContent.engineName), scriptContent) as CompiledScript
-            def scriptBody = engine.compile(scriptContent.content)
-            // def applicationContext = Registry.coreApplicationContext
-            def applicationContext = springWeb['occ/springmvc-v2']
-            // def defaultApplicationContext = scriptingLanguagesService.applicationContext
-            // this always returns null for scripts executed in the HAC
-            // def autoDisablingScriptStrategy = getAutoDisablingScriptStrategy(scriptContent)
-            def scriptExecutable = new PrecompiledExecutable(scriptBody, globalContext, applicationContext, null)
+        scriptExecutionResult = scriptingLanguagesService.with {
 
-            scriptExecutionResult = scriptExecutable.execute(globalContext, outputWriter, stackTraceWriter)
+            def scriptExecutable
+
+            if (hacSpringWebContext == 'default') {
+                scriptExecutable = getExecutableByContent(new SimpleScriptContent('groovy', decodedScript))
+            } else {
+                def engine = getEngine(scriptContent.engineName) as Compilable
+                def scriptBody = engine.compile(scriptContent.content)
+                def applicationContext = springWeb[hacSpringWebContext]
+                scriptExecutable = new PrecompiledExecutable(scriptBody, globalContext, applicationContext, null)
+            }
+
+            scriptExecutable.execute(globalContext, outputWriter, stackTraceWriter)
 
         }
 
     } catch (ScriptExecutionException ex) {
-        // de.hybris.platform.scripting.engine.exception.ScriptExecutionException
-        //   javax.script.ScriptException
-        def clean = false
+        def clean = true
         def scriptException = ex.cause.cause ?: ex.cause
         def stw = new StringWriter()
         scriptException.printStackTrace(new PrintWriter(stw))
@@ -239,7 +218,7 @@ try {
     // result[OUTPUT_TEXT_KEY] = scriptingLanguagesExecutor.stringifyOutStream(outputStream)
     result[OUTPUT_TEXT_KEY] = outputStream.toString('UTF-8')
     result[STACKTRACE_TEXT_KEY] = stackTraceText ?: stackTraceWriter.toString()
-    result[EXECUTION_RESULT_KEY] = mapObject(scriptExecutionResult?.scriptResult)
+    result[EXECUTION_RESULT_KEY] = scriptExecutionResult?.scriptResult?.toString() // mapObject(scriptExecutionResult?.scriptResult)
     return mapObject(result)
 
 } catch (Throwable t) {
@@ -252,7 +231,7 @@ try {
     } else {
         result[STACKTRACE_TEXT_KEY] = new StringWriter().withWriter {t.printStackTrace(new PrintWriter(it)); it}.toString()
     }
-    return result
+    return mapObject(result)
 
 } finally {
 

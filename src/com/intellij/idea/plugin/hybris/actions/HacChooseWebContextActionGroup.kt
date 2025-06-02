@@ -16,11 +16,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.intellij.idea.plugin.hybris.groovy.actions
+package com.intellij.idea.plugin.hybris.actions
 
 import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
-import com.intellij.idea.plugin.hybris.toolwindow.ReloadEnvironmentsAction
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -34,7 +35,7 @@ import javax.swing.Icon
 
 class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring Web Context" }, true)  {
 
-    var currentAction : WebContextAction? = WebContextAction("/hac", HybrisIcons.Y.LOGO_GREEN, this)
+    var currentAction : WebContextAction? = WebContextAction("default", HybrisIcons.Y.LOGO_GREEN, this)
 
     val separator = Separator.create()
 
@@ -61,15 +62,12 @@ class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring We
     override fun update(e: AnActionEvent) {
         val project = e.project ?: return
         val presentation = e.presentation
-
-        // val hacSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
         presentation.text = this.currentAction?.actionName ?: "Switch Web Context"
         this.currentAction?.icon?.let {  presentation.icon = it }
-        // else hacSettings.shortenConnectionName()
         presentation.isEnabledAndVisible = true
-
-        presentation.description = createHTML().div {
-            p { +"Switch Web Context" }
+        (this.currentAction?.actionName)?.let {
+            val hacSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+            hacSettings.hacSpringWebContext = it
         }
     }
 

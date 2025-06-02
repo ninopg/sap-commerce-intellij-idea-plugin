@@ -22,4 +22,5 @@ data class GroovySettings(
     var enableActionsToolbar: Boolean = true,
     var enableActionsToolbarForGroovyTest: Boolean = false,
     var enableActionsToolbarForGroovyIdeConsole: Boolean = false,
-)
+    var disableScriptTemplate: Boolean = false,
+    )

@@ -27,14 +27,10 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiElement
-import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.plugins.groovy.debugger.fragments.GroovyCodeFragment
-import org.jetbrains.plugins.groovy.lang.psi.GroovyFile
-import org.jetbrains.plugins.groovy.lang.psi.GroovyPsiElementFactory
-import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrReferenceExpression
+
 
 abstract class AbstractExecuteAction(
     internal val extension: String,
@@ -47,10 +43,14 @@ abstract class AbstractExecuteAction(
         consoleService.executeStatement()
     }
 
+    open fun preprocessContent(project: Project, editor: Editor, e: AnActionEvent, content: String): String {
+        // This method can be overridden to preprocess the content before execution
+        return content
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val editor = CommonDataKeys.EDITOR.getData(e.dataContext) ?: return
         val project = e.project ?: return
-        val psiFile = CommonDataKeys.PSI_FILE.getData(e.dataContext) ?: return
 
         val selectionModel = editor.selectionModel
         var content = selectionModel.selectedText
@@ -58,24 +58,7 @@ abstract class AbstractExecuteAction(
             content = editor.document.text
         }
 
-        if (selectionModel.hasSelection() && psiFile is GroovyFile && !psiFile.importStatements.isEmpty()) {
-
-            val document = editor.document
-            val selectionStartLine = document.getLineNumber(selectionModel.selectionStart)
-            val selectionEndLine = document.getLineNumber(selectionModel.selectionEnd)
-
-            val missingImports = psiFile.importStatements.filter { import ->
-                val importLine = document.getLineNumber(import.textOffset)
-                importLine < selectionStartLine || importLine > selectionEndLine
-            }
-
-            val importStatements = missingImports.map { it.text }
-            val importBlock = importStatements.joinToString(separator = "\n")
-            content = "$importBlock\n\n$content"
-
-        }
-
-        val undefinedVariables = analyzeCode(project,content)
+        content = preprocessContent(project, editor, e, content)
 
         with(HybrisToolWindowService.getInstance(project)) {
             activateToolWindow()
@@ -89,16 +72,8 @@ abstract class AbstractExecuteAction(
             return
         }
 
-        // read a resource file as a string
-        val templateStream = javaClass.getResourceAsStream("/ghac/scriptTemplate.groovy")
-        val template = templateStream?.bufferedReader()?.use { it.readText() } ?: ""
-        val replacedTemplate = template
-            .replace("\${PLACEHOLDER1}", "value1")
-            .replace("\${PLACEHOLDER2}", "value2")
-        // Add more replacements as needed
-
         consoleService.setActiveConsole(console)
-        console.setInputText("/* ${psiFile.name} */\n$replacedTemplate")
+        console.setInputText(content)
 
         invokeLater {
             doExecute(consoleService)
@@ -109,48 +84,6 @@ abstract class AbstractExecuteAction(
         val file = e.dataContext.getData(CommonDataKeys.VIRTUAL_FILE)
         val enabled = file != null && file.name.endsWith(this.extension)
         e.presentation.isEnabledAndVisible = enabled
-    }
-
-    private fun analyzeCode(project: Project, code: String): List<String> {
-
-        val undefinedVariables = mutableListOf<String>()
-
-        // groovy.lang.GroovyCodeSource
-        // org.jetbrains.plugins.groovy.debugger.fragments.GroovyCodeFragment extends GroovyFileImpl
-        // org.jetbrains.plugins.groovy.lang.psi.api.statements.blocks.GrCodeBlock
-
-        // Create a temporary Groovy PSI file
-        val factory = GroovyPsiElementFactory.getInstance(project)
-        val tempFile = factory.createGroovyFile("hacTemp.groovy", false, GroovyCodeFragment(project,code))
-
-        // Find all reference expressions (variable usages)
-        val references = PsiTreeUtil.findChildrenOfType(tempFile, GrReferenceExpression::class.java)
-            .filter { !it.isQualified } // Exclude qualified references (e.g., obj.field)
-
-        for (ref in references) {
-            val varName = ref.referenceName ?: continue
-
-            // Check if the variable is resolved
-            val resolved = ref.resolve()
-            if (resolved == null) {
-                // Check if the variable is defined locally
-                var isDefined = false
-                var parent: PsiElement? = ref.parent
-                while (parent != null && parent != tempFile) {
-                    if (parent is com.intellij.psi.PsiVariable && parent.name == varName) {
-                        isDefined = true
-                        break
-                    }
-                    parent = parent.parent
-                }
-                if (!isDefined) {
-                    undefinedVariables.add(varName)
-                }
-            }
-        }
-
-        return undefinedVariables
-
     }
 
     companion object {

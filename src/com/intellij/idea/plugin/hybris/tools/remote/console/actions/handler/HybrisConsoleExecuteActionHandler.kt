@@ -102,6 +102,8 @@ class HybrisConsoleExecuteActionHandler(
         activeConnectionSettings.displayName?.let { console.print("($it) ", LOG_INFO_OUTPUT) }
         console.print(activeConnectionSettings.generatedURL, NORMAL_OUTPUT)
         httpResult?.route?.let { console.print(" [ROUTE] $it\n", NORMAL_OUTPUT) }
+        activeConnectionSettings.hacSpringWebContext?.let { console.print(" [CONTEXT] $it\n", NORMAL_OUTPUT) }
+        console.print("\n", NORMAL_OUTPUT)
     }
 
     private fun printPlainText(console: HybrisConsole, httpResult: HybrisHttpResult?) {

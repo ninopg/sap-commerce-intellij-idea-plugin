@@ -54,6 +54,7 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
 
     var solrWebroot by string("solr")
     var hacWebroot by string("")
+    var hacSpringWebContext by string("default")
 
     val username: String
         get() = credentials?.userName

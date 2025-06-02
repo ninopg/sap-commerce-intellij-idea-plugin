@@ -44,7 +44,7 @@
         <action id="hybris.groovy.openQuery" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyOpenQueryAction"/>
         <action id="hybris.groovy.openSettings" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyOpenSettingsAction"/>
 
-        <group popup="true" searchable="false" id="hybris.groovy.select.web.context" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyChooseWebContextActionGroup"/>
+        <group popup="true" searchable="false" id="hybris.groovy.select.web.context" class="com.intellij.idea.plugin.hybris.actions.GroovyChooseWebContextActionGroup"/>
         <action id="hybris.groovy.generate.dynamic.properties" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyGenerateDynamicPropertiesAction"/>
 
         <group id="hybris.groovy.toolbar.left">

@@ -66,6 +66,13 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
                         .enabledIf(enableActionToolbar.selected)
                         .onApply { GroovyFileToolbarInstaller.getInstance()?.toggleToolbarForAllEditors(project) }
                 }
+                row {
+                    checkBox("Disable script template")
+                        .bindSelected(developerSettings::disableScriptTemplate)
+                        .comment("Disable script template for execution of Groovy scripts in hAC Groovy console.")
+                        .enabledIf(enableActionToolbar.selected)
+                        .onApply { GroovyFileToolbarInstaller.getInstance()?.toggleToolbarForAllEditors(project) }
+                }
             }
         }
     }
