@@ -62,6 +62,10 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
 
     private static final Logger LOG = Logger.getInstance(HybrisHacHttpClient.class);
 
+    public static final String EXECUTION_RESULT = "executionResult";
+    public static final String OUTPUT_TEXT = "outputText";
+    public static final String STACKTRACE_TEXT = "stacktraceText";
+
     public static HybrisHacHttpClient getInstance(@NotNull final Project project) {
         return project.getService(HybrisHacHttpClient.class);
     }
@@ -261,17 +265,17 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
             return createResult().errorMessage("Cannot parse response from the server...").build();
         }
 
-        if (json.get("stacktraceText") != null && isNotEmpty(json.get("stacktraceText").toString())) {
-            return createResult().errorMessage(json.get("stacktraceText").toString()).build();
+        if (json.get(STACKTRACE_TEXT) != null && isNotEmpty(json.get(STACKTRACE_TEXT).toString())) {
+            return createResult().errorMessage(json.get(STACKTRACE_TEXT).toString()).build();
         }
 
-        if (json.get("outputText") != null) {
-            resultBuilder.output(json.get("outputText").toString());
+        if (json.get(OUTPUT_TEXT) != null) {
+            resultBuilder.output(json.get(OUTPUT_TEXT).toString());
         }
 
-        if (json.get("executionResult") != null) {
+        if (json.get(EXECUTION_RESULT) != null) {
 
-            final var result = json.get("executionResult").toString();
+            final var result = json.get(EXECUTION_RESULT).toString();
 
             final var groovySettings = DeveloperSettingsComponent.getInstance(project).getState().getGroovySettings();
 
@@ -283,15 +287,19 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
 
                     final var nestedJson = new Gson().fromJson(result, HashMap.class);
 
-                    resultBuilder.result(nestedJson.get("executionResult").toString());
+                    if (nestedJson.get(EXECUTION_RESULT) != null) {
+                        resultBuilder.result(nestedJson.get(EXECUTION_RESULT).toString());
+                    } else {
+                        resultBuilder.result("");
+                    }
 
-                    if (nestedJson.get("outputText") != null && isNotEmpty(nestedJson.get("outputText").toString())) {
-                        resultBuilder.output(nestedJson.get("outputText").toString() + '\n' + json.get("outputText").toString());
+                    if (nestedJson.get(OUTPUT_TEXT) != null && isNotEmpty(nestedJson.get(OUTPUT_TEXT).toString())) {
+                        resultBuilder.output(nestedJson.get(OUTPUT_TEXT).toString() + '\n' + json.get(OUTPUT_TEXT).toString());
                     }
 
                     // TODO: actually I want to see the output even in case of error
-                    if (nestedJson.get("stacktraceText") != null && isNotEmpty(nestedJson.get("stacktraceText").toString())) {
-                        return createResult().errorMessage(nestedJson.get("stacktraceText").toString()).build();
+                    if (nestedJson.get(STACKTRACE_TEXT) != null && isNotEmpty(nestedJson.get(STACKTRACE_TEXT).toString())) {
+                        return createResult().errorMessage(nestedJson.get(STACKTRACE_TEXT).toString()).build();
                     }
 
                 } catch (RuntimeException e) {
@@ -371,18 +379,18 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
                 .build();
         }
 
-        final var stacktraceText = json.get("stacktraceText");
+        final var stacktraceText = json.get(STACKTRACE_TEXT);
         if (stacktraceText != null && isNotEmpty(stacktraceText.toString())) {
             return createResult()
                 .errorMessage(stacktraceText.toString())
                 .build();
         }
 
-        if (json.get("outputText") != null) {
-            resultBuilder.output(json.get("outputText").toString());
+        if (json.get(OUTPUT_TEXT) != null) {
+            resultBuilder.output(json.get(OUTPUT_TEXT).toString());
         }
-        if (json.get("executionResult") != null) {
-            resultBuilder.result(json.get("executionResult").toString());
+        if (json.get(EXECUTION_RESULT) != null) {
+            resultBuilder.result(json.get(EXECUTION_RESULT).toString());
         }
         return resultBuilder.build();
     }

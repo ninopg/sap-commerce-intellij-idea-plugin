@@ -224,6 +224,7 @@ try {
 } catch (Throwable t) {
 
     // result[OUTPUT_TEXT_KEY] = scriptingLanguagesExecutor.stringifyOutStream(outputStream)
+    result[EXECUTION_RESULT_KEY] = ''
     result[OUTPUT_TEXT_KEY] = outputStream.toString('UTF-8')
 
     if (!stackTraceWriter && !stackTraceWriter.toString()) {
