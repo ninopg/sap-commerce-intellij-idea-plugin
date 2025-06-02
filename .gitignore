@@ -43,4 +43,4 @@ jflex-*.jar
 
 resources/CHANGELOG.md
 
-src/com/intellij/idea/plugin/hybris/polyglotQuery/_PolyglotQueryLexer.java~
+src/com/intellij/idea/plugin/hybris/polyglotQuery/_PolyglotQueryLexer.java~.github/workflows/build.yml
