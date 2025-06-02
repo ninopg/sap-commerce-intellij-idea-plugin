@@ -18,31 +18,44 @@
 
 package com.intellij.idea.plugin.hybris.groovy.actions
 
+import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
-import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
-import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
-import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.idea.plugin.hybris.toolwindow.ReloadEnvironmentsAction
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import kotlinx.html.div
 import kotlinx.html.p
 import kotlinx.html.stream.createHTML
+import javax.swing.Icon
 
 class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring Web Context" }, true)  {
 
+    var currentAction : WebContextAction? = WebContextAction("/hac", HybrisIcons.Y.LOGO_GREEN, this)
+
+    val separator = Separator.create()
+
+    val reloadWebContextAction = ReloadWebContextAction()
+
     init {
-        templatePresentation.icon = HybrisIcons.Y.REMOTE
+        templatePresentation.icon = HybrisIcons.Y.LOGO_GREEN
         templatePresentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
     }
 
     override fun getChildren(e: AnActionEvent?): Array<out AnAction?> {
         val children = super.getChildren(e)
-        return children + listOf("/hac","/occ/springmvc-v2","/yacceleratorstorefront/springmvc").map{name ->
-            WebContextAction(name)
+        val actions = children + mapOf(
+            "default" to HybrisIcons.Y.LOGO_BLUE,
+            "/hac/springmvc-v2" to HybrisIcons.Y.LOGO_GREEN,
+            "/occ/springmvc-v2" to HybrisIcons.Y.LOGO_ORANGE,
+            "/yacceleratorstorefront/springmvc" to HybrisIcons.Y.LOGO_RED,
+        ).map { (name, icon) ->
+            WebContextAction(name, icon, this)
         }.toTypedArray()
+        return actions + separator + reloadWebContextAction
     }
 
     override fun update(e: AnActionEvent) {
@@ -50,7 +63,8 @@ class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring We
         val presentation = e.presentation
 
         // val hacSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
-        presentation.text = "web context" // hacSettings.shortenConnectionName() ?: "web context"
+        presentation.text = this.currentAction?.actionName ?: "Switch Web Context"
+        this.currentAction?.icon?.let {  presentation.icon = it }
         // else hacSettings.shortenConnectionName()
         presentation.isEnabledAndVisible = true
 
@@ -59,21 +73,25 @@ class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring We
         }
     }
 
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
 }
 
-class WebContextAction(private val actionName: String) :
-    AnAction(actionName, "", HybrisIcons.Y.REMOTE_GREEN)
+class WebContextAction(val actionName: String, val icon: Icon, private val parent: GroovyChooseWebContextActionGroup) :
+    AnAction(actionName, "", icon)
 {
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    override fun update(e: AnActionEvent) {
-        super.update(e)
-        val presentation = e.presentation
-        presentation.text = actionName
-        presentation.icon = HybrisIcons.Y.REMOTE_GREEN
-        presentation.isEnabledAndVisible = true
+    override fun actionPerformed(e: AnActionEvent) {
+        parent.currentAction = this
     }
+
+}
+
+class ReloadWebContextAction : AnAction("Reload Web Contexts", "Reloads the list of context", AllIcons.General.Refresh) {
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
 

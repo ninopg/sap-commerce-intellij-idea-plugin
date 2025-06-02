@@ -48,6 +48,7 @@ object HybrisIcons {
         val LOGO_BLUE = getIcon("/icons/hybrisIcon.svg")
         val LOGO_ORANGE = getIcon("/icons/hybrisIconOrange.svg")
         val LOGO_GREEN = getIcon("/icons/hybrisIconGreen.svg")
+        val LOGO_RED = getIcon("/icons/hybrisIconRed.svg")
         val REMOTE = getIcon("/icons/hybrisRemote.svg")
         val REMOTE_GREEN = getIcon("/icons/hybrisRemoteGreen.svg")
         val FACET = LOGO_GREEN

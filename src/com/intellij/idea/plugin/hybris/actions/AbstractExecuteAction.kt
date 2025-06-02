@@ -88,8 +88,17 @@ abstract class AbstractExecuteAction(
             LOG.warn("unable to find console $consoleName")
             return
         }
+
+        // read a resource file as a string
+        val templateStream = javaClass.getResourceAsStream("/ghac/scriptTemplate.groovy")
+        val template = templateStream?.bufferedReader()?.use { it.readText() } ?: ""
+        val replacedTemplate = template
+            .replace("\${PLACEHOLDER1}", "value1")
+            .replace("\${PLACEHOLDER2}", "value2")
+        // Add more replacements as needed
+
         consoleService.setActiveConsole(console)
-        console.setInputText("/* ${psiFile.name} */\n$content")
+        console.setInputText("/* ${psiFile.name} */\n$replacedTemplate")
 
         invokeLater {
             doExecute(consoleService)
@@ -144,9 +153,8 @@ abstract class AbstractExecuteAction(
 
     }
 
-
-
     companion object {
         private val LOG = Logger.getInstance(AbstractExecuteAction::class.java)
     }
+
 }
