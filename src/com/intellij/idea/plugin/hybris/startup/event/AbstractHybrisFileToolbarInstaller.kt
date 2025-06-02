@@ -55,7 +55,6 @@ abstract class AbstractHybrisFileToolbarInstaller(
         leftToolbar.updateActionsAsync()
         editor.permanentHeaderComponent = headerComponent
         editor.headerComponent = headerComponent
-
         ToggleToolbarAction.setToolbarVisible(
             toolbarId,
             PropertiesComponent.getInstance(project),

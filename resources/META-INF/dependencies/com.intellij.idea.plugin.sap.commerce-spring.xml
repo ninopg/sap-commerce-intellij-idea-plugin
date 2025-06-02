@@ -28,6 +28,9 @@
 
         <multiHostInjector implementation="com.intellij.idea.plugin.hybris.lang.injection.HybrisSpringELInjector"/>
         <spring.el.contexts order="first" implementation="com.intellij.idea.plugin.hybris.spring.context.CngSpringELContextsExtension"/>
+
+        <toolWindow id="Spring Beans" anchor="right" factoryClass="com.intellij.idea.plugin.hybris.spring.CustomTreeToolWindowFactory"/>
+
     </extensions>
 
 </idea-plugin>

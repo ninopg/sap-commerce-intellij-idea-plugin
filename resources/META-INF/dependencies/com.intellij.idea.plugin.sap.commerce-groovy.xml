@@ -35,24 +35,29 @@
     </extensions>
 
     <actions>
-        <action id="hybris.groovy.execute.commit.mode.on" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyExecuteInCommitModeOnAction">
-            <keyboard-shortcut first-keystroke="control shift alt ENTER" keymap="$default"/>
-        </action>
         <action id="hybris.groovy.execute.commit.mode.off" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyExecuteInCommitModeOffAction">
             <keyboard-shortcut first-keystroke="shift alt ENTER" keymap="$default"/>
+        </action>
+        <action id="hybris.groovy.execute.commit.mode.on" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyExecuteInCommitModeOnAction">
+            <keyboard-shortcut first-keystroke="control shift alt ENTER" keymap="$default"/>
         </action>
         <action id="hybris.groovy.openQuery" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyOpenQueryAction"/>
         <action id="hybris.groovy.openSettings" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyOpenSettingsAction"/>
 
+        <group popup="true" searchable="false" id="hybris.groovy.select.web.context" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyChooseWebContextActionGroup"/>
+        <action id="hybris.groovy.generate.dynamic.properties" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyGenerateDynamicPropertiesAction"/>
+
         <group id="hybris.groovy.toolbar.left">
-            <reference id="hybris.groovy.execute.commit.mode.on"/>
-            <reference id="hybris.groovy.execute.commit.mode.off"/>
-            <reference id="hybris.groovy.openQuery"/>
+            <reference ref="hybris.hac.chooseConnection"/>
+            <reference ref="hybris.groovy.select.web.context"/>
             <separator/>
-            <reference id="hybris.groovy.openSettings"/>
+            <reference ref="hybris.groovy.execute.commit.mode.off"/>
+            <reference ref="hybris.groovy.execute.commit.mode.on"/>
+            <reference ref="hybris.groovy.openQuery"/>
+            <reference ref="hybris.groovy.generate.dynamic.properties"/>
         </group>
         <group id="hybris.groovy.toolbar.right">
-            <reference id="hybris.hac.chooseConnection"/>
+            <reference ref="hybris.groovy.openSettings"/>
         </group>
     </actions>
 

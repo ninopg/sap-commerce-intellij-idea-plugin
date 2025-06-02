@@ -18,17 +18,25 @@
  */
 package com.intellij.idea.plugin.hybris.groovy.actions
 
+import com.intellij.idea.plugin.hybris.actions.AbstractExecuteAction
+import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
+import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsoleService
+import com.intellij.idea.plugin.hybris.tools.remote.console.impl.HybrisGroovyConsole
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.util.asSafely
+import org.jetbrains.plugins.groovy.GroovyFileType
+import javax.swing.Icon
 
-class GroovyExecuteInCommitModeOnAction : AbstractGroovyExecuteAction(
-    "Execute Groovy Script<br/>Commit Mode <strong><font color='#C75450'>ON</font></strong>",
-    "Execute Groovy Script on a remote SAP Commerce instance",
-    HybrisIcons.Console.Actions.EXECUTE_COMMIT_MODE_ON,
-    true
-)
-class GroovyExecuteInCommitModeOffAction : AbstractGroovyExecuteAction(
-    "Execute Groovy Script<br/>Commit Mode <strong><font color='#57965C'>OFF</font></strong>",
-    "Execute Groovy Script on a remote SAP Commerce instance",
-    HybrisIcons.Console.Actions.EXECUTE,
-    false
-)
+class GroovyGenerateDynamicPropertiesAction: AnAction(
+    "Generate Dynamic Properties",
+    null,
+    HybrisIcons.SPRING_BEAN
+) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+
+    }
+
+}

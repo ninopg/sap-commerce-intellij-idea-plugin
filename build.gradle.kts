@@ -37,7 +37,6 @@ plugins {
 
 repositories {
     mavenCentral()
-
     intellijPlatform {
         defaultRepositories()
         jetbrainsRuntime()

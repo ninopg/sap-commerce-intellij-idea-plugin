@@ -39,15 +39,17 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.EnumComboBoxModel
 import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.components.JBLoadingPanel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
-import com.intellij.ui.components.dialog
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.ComboBoxPredicate
 import com.intellij.ui.layout.selected
 import org.jetbrains.annotations.NotNull
+import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JComboBox
+
 
 class ReloadEnvironmentsAction(val subscriptionComboBox: JComboBox<CCv2Subscription>, val dialog: RemoteHacConnectionDialog) :
     AnAction(
@@ -124,6 +126,7 @@ class RemoteHacConnectionDialog(
         .login(project, testSettings)
 
     override fun panel() = panel {
+
         row {
             label("Connection name:")
                 .bold()
@@ -260,9 +263,6 @@ class RemoteHacConnectionDialog(
                 .addValidationRule("Address cannot be blank.") { it.selectedItem?.toString().isNullOrBlank() }
                 .component.apply {
                     isEditable = true
-                    // if (settings.hostIP?.isNotBlank() == true) {
-                    //    selectedItem = settings.hostIP
-                    // }
                 }
             }.layout(RowLayout.PARENT_GRID)
 

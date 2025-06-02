@@ -24,6 +24,9 @@ import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsole
 import com.intellij.idea.plugin.hybris.tools.remote.http.AbstractHybrisHacHttpClient
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
@@ -49,10 +52,13 @@ class HybrisGroovyConsole(project: Project) : HybrisConsole(project, HybrisConst
         isEditable = true
 
         val panel = JPanel(WrappedFlowLayout(0, 0))
+        val actionManager = ActionManager.getInstance()
+        val leftGroup = actionManager.getAction("hybris.hac.chooseConnection") as ActionGroup
+        val leftToolbar = actionManager.createActionToolbar(ActionPlaces.TOOLBAR, leftGroup, true)
+        panel.add(leftToolbar.component, "Left")
         panel.add(commitCheckbox)
         panel.add(JBLabel("Timeout (seconds):").also { it.border = bordersLabel })
         panel.add(timeoutSpinner)
-
         add(panel, BorderLayout.NORTH)
 
         ConsoleHistoryController(MyConsoleRootType, "hybris.groovy.shell", this).install()
