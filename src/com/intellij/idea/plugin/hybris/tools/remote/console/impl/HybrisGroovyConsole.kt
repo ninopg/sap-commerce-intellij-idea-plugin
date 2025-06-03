@@ -50,17 +50,11 @@ class HybrisGroovyConsole(project: Project) : HybrisConsole(project, HybrisConst
 
     init {
         isEditable = true
-
         val panel = JPanel(WrappedFlowLayout(0, 0))
-        val actionManager = ActionManager.getInstance()
-        val leftGroup = actionManager.getAction("hybris.hac.chooseConnection") as ActionGroup
-        val leftToolbar = actionManager.createActionToolbar(ActionPlaces.TOOLBAR, leftGroup, true)
-        panel.add(leftToolbar.component, "Left")
         panel.add(commitCheckbox)
         panel.add(JBLabel("Timeout (seconds):").also { it.border = bordersLabel })
         panel.add(timeoutSpinner)
         add(panel, BorderLayout.NORTH)
-
         ConsoleHistoryController(MyConsoleRootType, "hybris.groovy.shell", this).install()
     }
 

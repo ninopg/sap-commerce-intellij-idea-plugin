@@ -1,5 +1,7 @@
 # TODO
-
+- highlight line in the stack trace with the execption for the scipt
+- check if the springWebContext passed to execute the script id valid throw an error and do not execute the script
+- import don't work with script template
 - refresh of web context
 - create dynamic properties using DynamicManager
 - add context of beans in auto-completion, different icon for web and non web
@@ -7,3 +9,4 @@
 - add doc to beans (ex: location)
 - add in the combo the application core and global as entries
 - execution on multiple nodes
+- for scripts executed in the console the template is not applied

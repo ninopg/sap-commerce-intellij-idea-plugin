@@ -43,12 +43,12 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.intellij.idea.plugin.hybris.tools.remote.http.impex.HybrisHttpResult.HybrisHttpResultBuilder.createResult;
@@ -229,12 +229,21 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
     HybrisHttpResult executeGroovyScript(
         final Project project, final String content, final boolean isCommitMode, final int timeout
     ) {
+        return executeGroovyScript(project, content, isCommitMode, timeout, null);
+    }
+
+    public @NotNull
+    HybrisHttpResult executeGroovyScript(
+        final Project project, final String content, final boolean isCommitMode, final int timeout, final String springWebContext
+    ) {
+
+        final String script = springWebContext == null ? content : applyScriptTemplate(content, springWebContext);
 
         final var settings = RemoteConnectionUtil.INSTANCE.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris);
         final var params = Arrays.asList(
             new BasicNameValuePair("scriptType", "groovy"),
             new BasicNameValuePair("commit", String.valueOf(isCommitMode)),
-            new BasicNameValuePair("script", content)
+            new BasicNameValuePair("script", script)
         );
         HybrisHttpResult.HybrisHttpResultBuilder resultBuilder = createResult();
         final String actionUrl = settings.getGeneratedURL() + "/console/scripting/execute";
@@ -394,4 +403,34 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
         }
         return resultBuilder.build();
     }
+
+    public String applyScriptTemplate(final String script, final String webContext) {
+        final String template = getScript("/ghac/scriptTemplate.groovy");
+        if (template == null) {
+            // TODO: handle this case properly
+            return script;
+        }
+        final String encodedScript = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
+        return template.replace("$hacEncodedScript", encodedScript).replace("$hacSpringWebContext", webContext);
+    }
+
+    public String getScript(String path) {
+
+        final InputStream templateStream = getClass().getResourceAsStream(path);
+        String template = null;
+
+        if (templateStream != null) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(templateStream, StandardCharsets.UTF_8))) {
+                template = reader.lines().collect(Collectors.joining("\n"));
+            } catch (Exception e) {
+                // REVIEWME
+                e.printStackTrace(); // Handle error as needed
+                return null;
+            }
+        }
+
+        return template;
+
+    }
+
 }

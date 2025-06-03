@@ -162,11 +162,16 @@ try {
 
     try {
 
-        springWeb.keySet().each{println it}
-
         def scriptContent = new SimpleScriptContent('groovy', decodedScript)
 
         def hacSpringWebContext = '$hacSpringWebContext'
+        def applicationContext = springWeb[hacSpringWebContext]
+
+        if (hacSpringWebContext != 'default' && !applicationContext) {
+            println "invalid hacSpringWebContext: ${hacSpringWebContext}, valid contexts are:"
+            springWeb.keySet().each{println it}
+            return [(OUTPUT_TEXT_KEY):outputStream.toString('UTF-8'), (EXECUTION_RESULT_KEY): ""]
+        }
 
         scriptExecutionResult = scriptingLanguagesService.with {
 
@@ -177,7 +182,6 @@ try {
             } else {
                 def engine = getEngine(scriptContent.engineName) as Compilable
                 def scriptBody = engine.compile(scriptContent.content)
-                def applicationContext = springWeb[hacSpringWebContext]
                 scriptExecutable = new PrecompiledExecutable(scriptBody, globalContext, applicationContext, null)
             }
 
@@ -186,7 +190,7 @@ try {
         }
 
     } catch (ScriptExecutionException ex) {
-        def clean = true
+        def clean = false
         def scriptException = ex.cause.cause ?: ex.cause
         def stw = new StringWriter()
         scriptException.printStackTrace(new PrintWriter(stw))

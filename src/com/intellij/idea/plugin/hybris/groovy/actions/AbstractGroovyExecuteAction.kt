@@ -25,6 +25,7 @@ import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsoleService
 import com.intellij.idea.plugin.hybris.tools.remote.console.impl.HybrisGroovyConsole
+import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
@@ -83,7 +84,7 @@ abstract class AbstractGroovyExecuteAction(controlText: String, controlDescripti
 
             val importStatements = missingImports.map { it.text }
             val importBlock = importStatements.joinToString(separator = "\n")
-            processedContent = "$importBlock\n\n$content"
+            processedContent = "$importBlock\n\n$processedContent"
 
         }
 
@@ -93,14 +94,10 @@ abstract class AbstractGroovyExecuteAction(controlText: String, controlDescripti
 
         if (!settings.groovySettings.disableScriptTemplate) {
 
+            // REVIEWME
             val hacConnectionSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
-
-            // read a resource file as a string
-            val templateStream = javaClass.getResourceAsStream("/ghac/scriptTemplate.groovy")
-            val template = templateStream?.bufferedReader()?.use { it.readText() } ?: ""
-            processedContent = template
-                .replace("\$hacEncodedScript", String(Base64.getEncoder().encode(content.toByteArray(StandardCharsets.UTF_8)), StandardCharsets.UTF_8))
-                .replace("\$hacSpringWebContext", hacConnectionSettings.hacSpringWebContext ?: "default")
+            val hacClient = HybrisHacHttpClient.getInstance(project)
+            processedContent = hacClient.applyScriptTemplate(processedContent, hacConnectionSettings.hacSpringWebContext ?: "default")
 
         }
 

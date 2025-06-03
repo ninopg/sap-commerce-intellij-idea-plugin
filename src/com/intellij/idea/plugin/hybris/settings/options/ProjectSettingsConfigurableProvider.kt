@@ -102,6 +102,11 @@ class ProjectSettingsConfigurableProvider(val project: Project) : ConfigurablePr
                         .comment("If checked, complete module name will be represented as <code>[Platform.core]</code> instead of <code>core</code>.")
                         .bindSelected(projectSettings::showFullModuleName)
                 }
+                row {
+                    checkBox("Force Hybris project")
+                        .comment("If checked the project is marked as Hybris project, even if it does not contain any Hybris modules.")
+                        .bindSelected(projectSettings::hybrisProject)
+                }
             }
 
             group(message("hybris.settings.project.refresh.title")) {

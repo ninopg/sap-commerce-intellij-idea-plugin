@@ -32,6 +32,8 @@
 
         <!-- <postStartupActivity implementation="com.intellij.idea.plugin.hybris.startup.GDSLStartupActivity"/> -->
 
+        <!-- <completion.contributor language="Groovy" implementationClass="com.intellij.idea.plugin.hybris.groovy.completion.HacBeansCompletionContributor"/> -->
+
     </extensions>
 
     <actions>

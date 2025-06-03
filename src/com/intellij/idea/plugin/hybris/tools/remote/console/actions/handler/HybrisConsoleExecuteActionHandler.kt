@@ -23,8 +23,13 @@ import com.intellij.execution.console.ConsoleHistoryController
 import com.intellij.execution.impl.ConsoleViewUtil
 import com.intellij.execution.ui.ConsoleViewContentType.*
 import com.intellij.idea.plugin.hybris.impex.file.ImpexFileType
+import com.intellij.idea.plugin.hybris.settings.CCv2Subscription
+import com.intellij.idea.plugin.hybris.settings.components.ApplicationSettingsComponent
+import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2ServiceDto
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil.getActiveRemoteConnectionSettings
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsole
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsoleService
 import com.intellij.idea.plugin.hybris.tools.remote.console.impl.HybrisImpexMonitorConsole
@@ -39,6 +44,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.configuration.HeadlessLogging
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.StringUtil
 
@@ -59,32 +65,77 @@ class HybrisConsoleExecuteActionHandler(
                     isProcessRunning = true
                     try {
                         setEditorEnabled(console, false)
-                        val httpResult = console.execute(query)
-
+                        var httpResult : HybrisHttpResult
                         when (console) {
                             is HybrisImpexMonitorConsole -> {
+                                httpResult = console.execute(query)
                                 console.clear()
                                 printSyntaxText(console, httpResult.output, ImpexFileType)
                             }
-
                             is HybrisSolrSearchConsole -> {
+                                httpResult = console.execute(query)
                                 console.clear()
-
-                                printCurrentHost(console, RemoteConnectionType.SOLR, httpResult)
-
+                                printCurrentHost(console, RemoteConnectionType.SOLR)
                                 if (httpResult.hasError()) {
                                     printSyntaxText(console, httpResult.errorMessage, PlainTextFileType.INSTANCE)
                                 } else {
                                     printSyntaxText(console, httpResult.output, JsonFileType.INSTANCE)
                                 }
-
                             }
-
                             else -> {
-                                printCurrentHost(console, RemoteConnectionType.Hybris, httpResult)
 
-                                printPlainText(console, httpResult)
+                                // hac
+
+                                val settings = getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+                                val aspectName = settings.replicaId
+
+                                if (aspectName?.endsWith("-*") ?: false) {
+
+                                    try {
+
+                                        val aspectPrefix = settings.replicaId?.removeSuffix("-*")?.lowercase() as String
+
+                                        ApplicationSettingsComponent.getInstance().state.ccv2Subscriptions.firstOrNull { it.uuid == settings.subscription }
+                                            ?.let { subscription ->
+
+                                                settings.environment?.let { environment ->
+
+                                                    CCv2Service.getInstance(project).fetchEnvironmentServices(
+                                                        subscription,
+                                                        environment,
+                                                        {},
+                                                        { services ->
+                                                            {
+                                                                services?.forEach { service ->
+                                                                    if (service.name.lowercase().startsWith(aspectPrefix)) {
+                                                                        service.replicas.forEach { replica ->
+                                                                            settings.replicaId = replica.name
+                                                                            printCurrentHost(console, RemoteConnectionType.Hybris)
+                                                                            httpResult = console.execute(query)
+                                                                            printPlainText(console, httpResult)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    )
+
+                                                }
+
+                                            }
+
+                                    } finally {
+                                        settings.replicaId = aspectName
+                                    }
+
+                                } else {
+                                    printCurrentHost(console, RemoteConnectionType.Hybris)
+                                    httpResult = console.execute(query)
+                                    printPlainText(console, httpResult)
+                                }
+
                             }
+
                         }
                     } finally {
                         isProcessRunning = false
@@ -96,13 +147,13 @@ class HybrisConsoleExecuteActionHandler(
         }
     }
 
-    private fun printCurrentHost(console: HybrisConsole, remoteConnectionType: RemoteConnectionType, httpResult: HybrisHttpResult?) {
+    private fun printCurrentHost(console: HybrisConsole, remoteConnectionType: RemoteConnectionType) {
         val activeConnectionSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, remoteConnectionType)
         console.print("[HOST] ", SYSTEM_OUTPUT)
         activeConnectionSettings.displayName?.let { console.print("($it) ", LOG_INFO_OUTPUT) }
         console.print(activeConnectionSettings.generatedURL, NORMAL_OUTPUT)
-        httpResult?.route?.let { console.print(" [ROUTE] $it\n", NORMAL_OUTPUT) }
-        activeConnectionSettings.hacSpringWebContext?.let { console.print(" [CONTEXT] $it\n", NORMAL_OUTPUT) }
+        activeConnectionSettings.replicaId?.let { console.print(" [REPLICA] $it\n", NORMAL_OUTPUT) }
+        activeConnectionSettings.hacSpringWebContext?.let { console.print(" [CONTEXT] $it", NORMAL_OUTPUT) }
         console.print("\n", NORMAL_OUTPUT)
     }
 
