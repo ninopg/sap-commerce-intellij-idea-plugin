@@ -20,8 +20,10 @@ package com.intellij.idea.plugin.hybris.groovy.actions
 
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.groovy.GroovyHACService
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.components.ComponentManagerEx
 import com.intellij.openapi.diagnostic.Logger
 
 class GroovyGenerateDynamicPropertiesAction: AnAction(
@@ -41,6 +43,8 @@ class GroovyGenerateDynamicPropertiesAction: AnAction(
         service.loadBeanDefinitions(e)
 
     }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     companion object {
         private val LOG = Logger.getInstance(GroovyGenerateDynamicPropertiesAction::class.java)

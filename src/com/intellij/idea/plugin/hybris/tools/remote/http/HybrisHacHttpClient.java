@@ -296,7 +296,7 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
 
             final var groovySettings = DeveloperSettingsComponent.getInstance(project).getState().getGroovySettings();
 
-            if (groovySettings.getDisableScriptTemplate()) {
+            if (groovySettings.getDisableScriptTemplate() && scriptTemplatePath == null) {
                 resultBuilder.result(result);
             } else {
 

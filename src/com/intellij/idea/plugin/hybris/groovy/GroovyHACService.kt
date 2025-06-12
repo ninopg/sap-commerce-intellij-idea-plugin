@@ -42,11 +42,29 @@ private const val GHAC_SPRING_BEANS_GROOVY = "/ghac/springBeans.groovy"
 class GroovyHACService(val project: Project, private val coroutineScope: CoroutineScope) {
 
     fun loadBeanDefinitions(event: AnActionEvent) {
-
         val project = event.project
-        if (project == null) return
+        if (project != null) {
+            coroutineScope.launch {
+                doloadBeanDefinitions(project)
+            }
+        }
+    }
 
-        coroutineScope.launch {
+    fun loadWebContexts(event: AnActionEvent, webContexts: MutableList<String>) {
+        val project = event.project
+        if (project != null) {
+            coroutineScope.launch {
+                doLoadWebContexts(project, webContexts)
+            }
+        }
+    }
+
+    private suspend fun doloadBeanDefinitions(project: Project) {
+
+        // val project = event.project
+        // if (project == null) return
+
+        // coroutineScope.launch {
 
             var success = false
             var resultMessage = "Task completed"
@@ -91,9 +109,9 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
 
                                     for ((key, value) in json.entries) {
 
-                                        LOG.info("processing bean definitions for spring context ${key}")
+                                        LOG.info("processing bean definitions for spring context $key")
 
-                                        progressReporter.sizedStep(100 * currentContext / totContexts, "Processing bean definitions for spring context ${key}") {
+                                        progressReporter.sizedStep(100 * currentContext / totContexts, "Processing bean definitions for spring context $key") {
 
                                             val context = json.get(key) as Map<String, Any?>
 
@@ -153,19 +171,23 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
                                     LOG.info("done: updated/added: $beanCounter1, found: $beanCounter2")
 
                                     success = true
-                                    resultMessage = "$beanCounter2 bean definitions found."
+                                    resultMessage = "$beanCounter1/$beanCounter2 bean definitions registered/found."
 
                                 }
 
                             } catch (e: Exception) {
                                 val errorMessage = "Error loading beans ${e.message}"
+                                success = false
                                 windowManager.info = errorMessage
+                                resultMessage = errorMessage
                                 LOG.error("Error loading beans", e)
                             }
 
                         } else {
                             val errorMessage = "Script $GHAC_SPRING_BEANS_GROOVY not found"
+                            success = false
                             windowManager.info = errorMessage
+                            resultMessage = errorMessage
                             LOG.error(errorMessage)
                         }
 
@@ -185,8 +207,7 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
 
             }
 
-        }
-
+        // }
 
     }
 
@@ -209,15 +230,15 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
         return false
     }
 
-    fun loadWebContexts(event: AnActionEvent, webContexts: MutableList<String>) {
-        val project = event.project
-        if (project == null) return
+    private suspend fun doLoadWebContexts(project: Project, webContexts: MutableList<String>) {
+        // val project = event.project
+        // if (project == null) return
 
         var success = false
         var resultMessage = "Task completed"
 
-        coroutineScope.launch {
-            val windowManager = WindowManager.getInstance().getStatusBar(project)
+        // coroutineScope.launch {
+            // val windowManager = WindowManager.getInstance().getStatusBar(project)
             reportProgress(1) { progressReporter ->
                 progressReporter.sizedStep(1, "Loading Spring Web Contexts...") {
                     try {
@@ -241,7 +262,7 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
                     }
                 }
             }
-        }
+        // }
     }
 
     companion object {

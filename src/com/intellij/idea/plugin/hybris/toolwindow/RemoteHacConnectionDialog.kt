@@ -468,14 +468,23 @@ class RemoteHacConnectionDialog(
                         diableOtherComboBoxes(serviceComboBox)
                     },
                     { services ->
+
                         val matchingServices = (
                             if (serviceComboBox.selectedItem?.toString()?.isNotBlank() == true)
                                 services?.firstOrNull{s -> s.code.lowercase() == "hcs_platform_${serviceComboBox.selectedItem}" }?.replicas
                             else
                                 services?.filter{ s -> s.code.startsWith("hcs_platform_")}?.flatMap{ it.replicas }
                             ) ?: emptyList()
-                        replicaIdsComboBoxModel.update(matchingServices.map { r -> r.name })
+
+                        val ids = matchingServices.map { r -> r.name }.toMutableList()
+
+                        if (serviceComboBox.selectedItem?.toString()?.isNotBlank() == true) {
+                            ids.add("${serviceComboBox.selectedItem}-*")
+                        }
+
+                        replicaIdsComboBoxModel.update(ids)
                         enableAll(serviceComboBox)
+
                     }
                 )
             }

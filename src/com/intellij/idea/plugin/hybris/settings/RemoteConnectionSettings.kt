@@ -53,7 +53,7 @@ class RemoteConnectionSettings : BaseState(), Comparable<RemoteConnectionSetting
     var replicaId by string(null)
 
     var solrWebroot by string("solr")
-    var hacWebroot by string("")
+    var hacWebroot by string("/hac")
     var hacSpringWebContext by string("default")
 
     val username: String

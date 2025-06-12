@@ -45,7 +45,7 @@ class HybrisGroovyConsole(project: Project) : HybrisConsole(project, HybrisConst
 
     private val commitCheckbox = JBCheckBox("Commit mode")
         .also { it.border = borders10 }
-    private val timeoutSpinner = JSpinner(SpinnerNumberModel(AbstractHybrisHacHttpClient.DEFAULT_HAC_TIMEOUT / 1000, 1, 3600, 10))
+    private val timeoutSpinner = JSpinner(SpinnerNumberModel(AbstractHybrisHacHttpClient.DEFAULT_HAC_TIMEOUT / 1000, 1, 3600, 6))
         .also { it.border = borders5 }
 
     init {
