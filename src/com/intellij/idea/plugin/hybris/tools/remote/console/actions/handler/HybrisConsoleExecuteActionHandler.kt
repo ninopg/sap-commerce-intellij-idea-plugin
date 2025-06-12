@@ -91,42 +91,38 @@ class HybrisConsoleExecuteActionHandler(
 
                                 if (aspectName?.endsWith("-*") ?: false) {
 
-                                    try {
+                                    val aspectPrefix = settings.replicaId?.removeSuffix("-*")?.lowercase() as String
 
-                                        val aspectPrefix = settings.replicaId?.removeSuffix("-*")?.lowercase() as String
+                                    ApplicationSettingsComponent.getInstance().state.ccv2Subscriptions.firstOrNull { it.uuid == settings.subscription }
+                                        ?.let { subscription ->
 
-                                        ApplicationSettingsComponent.getInstance().state.ccv2Subscriptions.firstOrNull { it.uuid == settings.subscription }
-                                            ?.let { subscription ->
+                                            settings.environment?.let { environment ->
 
-                                                settings.environment?.let { environment ->
-
-                                                    CCv2Service.getInstance(project).fetchEnvironmentServices(
-                                                        subscription,
-                                                        environment,
-                                                        {},
-                                                        { services ->
-                                                            {
-                                                                services?.forEach { service ->
-                                                                    if (service.name.lowercase().startsWith(aspectPrefix)) {
-                                                                        service.replicas.forEach { replica ->
-                                                                            settings.replicaId = replica.name
-                                                                            printCurrentHost(console, RemoteConnectionType.Hybris)
-                                                                            httpResult = console.execute(query)
-                                                                            printPlainText(console, httpResult)
-                                                                        }
+                                                CCv2Service.getInstance(project).fetchEnvironmentServices(
+                                                    subscription,
+                                                    environment,
+                                                    {},
+                                                    { services ->
+                                                        try {
+                                                            services?.forEach { service ->
+                                                                if (service.code.lowercase() == "hcs_platform_${aspectPrefix}") {
+                                                                    service.replicas.forEach { replica ->
+                                                                        settings.replicaId = replica.name
+                                                                        printCurrentHost(console, RemoteConnectionType.Hybris)
+                                                                        httpResult = console.execute(query)
+                                                                        printPlainText(console, httpResult)
                                                                     }
                                                                 }
                                                             }
+                                                        } finally {
+                                                            settings.replicaId = aspectName
                                                         }
-                                                    )
-
-                                                }
+                                                    }
+                                                )
 
                                             }
 
-                                    } finally {
-                                        settings.replicaId = aspectName
-                                    }
+                                        }
 
                                 } else {
                                     printCurrentHost(console, RemoteConnectionType.Hybris)
@@ -152,7 +148,7 @@ class HybrisConsoleExecuteActionHandler(
         console.print("[HOST] ", SYSTEM_OUTPUT)
         activeConnectionSettings.displayName?.let { console.print("($it) ", LOG_INFO_OUTPUT) }
         console.print(activeConnectionSettings.generatedURL, NORMAL_OUTPUT)
-        activeConnectionSettings.replicaId?.let { console.print(" [REPLICA] $it\n", NORMAL_OUTPUT) }
+        activeConnectionSettings.replicaId?.let { console.print(" [REPLICA] $it", NORMAL_OUTPUT) }
         activeConnectionSettings.hacSpringWebContext?.let { console.print(" [CONTEXT] $it", NORMAL_OUTPUT) }
         console.print("\n", NORMAL_OUTPUT)
     }
@@ -182,6 +178,7 @@ class HybrisConsoleExecuteActionHandler(
             console.print("[RESULT] \n", SYSTEM_OUTPUT)
             console.print(res, NORMAL_OUTPUT)
         }
+        console.print("\n\n", NORMAL_OUTPUT)
     }
 
     private fun printSyntaxText(console: HybrisConsole, output: String, fileType: FileType) {

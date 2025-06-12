@@ -49,6 +49,11 @@
         <group popup="true" searchable="false" id="hybris.groovy.select.web.context" class="com.intellij.idea.plugin.hybris.actions.GroovyChooseWebContextActionGroup"/>
         <action id="hybris.groovy.generate.dynamic.properties" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyGenerateDynamicPropertiesAction"/>
 
+        <!--
+        <action id="hybris.groovy.test.action" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyTestAction"/>
+        <action id="hybris.groovy.test.action.grok" class="com.intellij.idea.plugin.hybris.groovy.actions.GroovyTestActionGrok"/>
+        -->
+
         <group id="hybris.groovy.toolbar.left">
             <reference ref="hybris.hac.chooseConnection"/>
             <reference ref="hybris.groovy.select.web.context"/>
@@ -57,6 +62,8 @@
             <reference ref="hybris.groovy.execute.commit.mode.on"/>
             <reference ref="hybris.groovy.openQuery"/>
             <reference ref="hybris.groovy.generate.dynamic.properties"/>
+            <reference ref="hybris.groovy.test.action"/>
+            <reference ref="hybris.groovy.test.action.grok"/>
         </group>
         <group id="hybris.groovy.toolbar.right">
             <reference ref="hybris.groovy.openSettings"/>

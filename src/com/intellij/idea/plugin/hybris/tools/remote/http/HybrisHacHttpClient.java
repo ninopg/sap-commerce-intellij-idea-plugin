@@ -20,6 +20,7 @@
 package com.intellij.idea.plugin.hybris.tools.remote.http;
 
 import com.google.gson.Gson;
+import com.intellij.idea.plugin.hybris.settings.GroovySettings;
 import com.intellij.idea.plugin.hybris.settings.RemoteConnectionSettings;
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent;
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType;
@@ -31,7 +32,10 @@ import com.intellij.idea.plugin.hybris.tools.remote.http.solr.impl.SolrHttpClien
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
@@ -48,6 +52,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -65,6 +71,7 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
     public static final String EXECUTION_RESULT = "executionResult";
     public static final String OUTPUT_TEXT = "outputText";
     public static final String STACKTRACE_TEXT = "stacktraceText";
+    public static final String GHAC_SCRIPT_TEMPLATE_GROOVY = "/ghac/scriptTemplate.groovy";
 
     public static HybrisHacHttpClient getInstance(@NotNull final Project project) {
         return project.getService(HybrisHacHttpClient.class);
@@ -229,17 +236,18 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
     HybrisHttpResult executeGroovyScript(
         final Project project, final String content, final boolean isCommitMode, final int timeout
     ) {
-        return executeGroovyScript(project, content, isCommitMode, timeout, null);
+        return executeGroovyScript(project, content, isCommitMode, timeout, null, null);
     }
 
     public @NotNull
     HybrisHttpResult executeGroovyScript(
-        final Project project, final String content, final boolean isCommitMode, final int timeout, final String springWebContext
+        final Project project, final String content, final boolean isCommitMode, final int timeout, final String springWebContext, final String scriptTemplatePath
     ) {
 
-        final String script = springWebContext == null ? content : applyScriptTemplate(content, springWebContext);
+        final String script = springWebContext == null ? content : applyScriptTemplate(project, content, springWebContext, scriptTemplatePath);
 
         final var settings = RemoteConnectionUtil.INSTANCE.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris);
+
         final var params = Arrays.asList(
             new BasicNameValuePair("scriptType", "groovy"),
             new BasicNameValuePair("commit", String.valueOf(isCommitMode)),
@@ -404,28 +412,64 @@ public final class HybrisHacHttpClient extends AbstractHybrisHacHttpClient {
         return resultBuilder.build();
     }
 
-    public String applyScriptTemplate(final String script, final String webContext) {
-        final String template = getScript("/ghac/scriptTemplate.groovy");
-        if (template == null) {
-            // TODO: handle this case properly
-            return script;
-        }
-        final String encodedScript = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
-        return template.replace("$hacEncodedScript", encodedScript).replace("$hacSpringWebContext", webContext);
+    public String applyScriptTemplate(final Project project, final String script) {
+        return applyScriptTemplate(project, script, null, null);
     }
 
-    public String getScript(String path) {
+    public String applyScriptTemplate(final Project project, final String script, final String webContext, final String scriptTemplate) {
+
+        final var statusBar = WindowManager.getInstance().getStatusBar(project);
+        final var hacConnectionSettings = RemoteConnectionUtil.INSTANCE.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris);
+        final var groovySettings = DeveloperSettingsComponent.getInstance(project).getState().getGroovySettings();
+
+        final var activeWebContext = webContext != null ? webContext : (hacConnectionSettings.getHacSpringWebContext() != null ? hacConnectionSettings.getHacSpringWebContext() : "default");
+
+        var scriptTemplatePath = GHAC_SCRIPT_TEMPLATE_GROOVY;
+
+        if (scriptTemplate != null) {
+            scriptTemplatePath = scriptTemplate;
+        } else {
+            if (groovySettings.getUseCustomScriptTemplate() && StringUtils.isNotBlank(groovySettings.getCustomScriptTemplatePath())) {
+                // apply custom template
+                scriptTemplatePath = "file://" + groovySettings.getCustomScriptTemplatePath();
+            } else if (groovySettings.getUseCustomScriptTemplate() && StringUtils.isBlank(groovySettings.getCustomScriptTemplatePath())) {
+                // can't apply custom template
+                statusBar.setInfo("Can't find custom script template " + groovySettings.getCustomScriptTemplatePath());
+            }
+        }
+
+        String template = null;
+
+        try {
+            if (scriptTemplatePath.startsWith("file://")) {
+                template = Files.readString(Path.of(scriptTemplatePath.substring("file://".length())), StandardCharsets.UTF_8);
+            } else {
+                template = getScriptAsResource(scriptTemplatePath);
+            }
+        } catch (IOException e) {
+            statusBar.setInfo(String.format("Can't find custom script template %s [%s]", scriptTemplatePath, e.getMessage()));
+            LOG.error(String.format("Can't find custom script template %s", scriptTemplatePath), e);
+        }
+
+        if (template == null) {
+            statusBar.setInfo("Can't load custom script template " + groovySettings.getCustomScriptTemplatePath());
+            LOG.error("Can't load custom script template " + groovySettings.getCustomScriptTemplatePath());
+            return script;
+        }
+
+        final var encodedScript = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
+        return template.replace("$hacEncodedScript", encodedScript).replace("$hacSpringWebContext", activeWebContext);
+
+    }
+
+    public String getScriptAsResource(final String path) throws IOException{
 
         final InputStream templateStream = getClass().getResourceAsStream(path);
         String template = null;
 
         if (templateStream != null) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(templateStream, StandardCharsets.UTF_8))) {
+            try (final BufferedReader reader = new BufferedReader(new InputStreamReader(templateStream, StandardCharsets.UTF_8))) {
                 template = reader.lines().collect(Collectors.joining("\n"));
-            } catch (Exception e) {
-                // REVIEWME
-                e.printStackTrace(); // Handle error as needed
-                return null;
             }
         }
 

@@ -1,5 +1,6 @@
 # TODO
-- highlight line in the stack trace with the execption for the scipt
+- when api-* and refreshing of web contexts/beans it should be set to ''
+- highlight line in the stack trace with the execption for the script
 - check if the springWebContext passed to execute the script id valid throw an error and do not execute the script
 - import don't work with script template
 - refresh of web context

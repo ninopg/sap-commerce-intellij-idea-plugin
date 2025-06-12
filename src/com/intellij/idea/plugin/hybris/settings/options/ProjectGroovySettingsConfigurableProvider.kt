@@ -23,11 +23,17 @@ import com.intellij.idea.plugin.hybris.common.utils.HybrisI18NBundleUtils.messag
 import com.intellij.idea.plugin.hybris.groovy.file.GroovyFileToolbarInstaller
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.settings.components.ProjectSettingsComponent
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.observable.util.bind
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.options.ConfigurableProvider
 import com.intellij.openapi.project.Project
+import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.bindSelected
+import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.toNonNullableProperty
+import com.intellij.ui.dsl.builder.toNullableProperty
 import com.intellij.ui.layout.selected
 import javax.swing.JCheckBox
 
@@ -72,6 +78,17 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
                         .comment("Disable script template for execution of Groovy scripts in hAC Groovy console.")
                         .enabledIf(enableActionToolbar.selected)
                         .onApply { GroovyFileToolbarInstaller.getInstance()?.toggleToolbarForAllEditors(project) }
+                }
+                row {
+                    val customScriptTemplateCheckBox = checkBox("Use a custom script template:")
+                            .bindSelected(developerSettings::useCustomScriptTemplate)
+                            .component
+                    textFieldWithBrowseButton("Select Groovy Script Template")
+                        .align(AlignX.FILL)
+                        .bindText(developerSettings::customScriptTemplatePath)
+                        .comment("Default script template ghac/scriptTemplate.groovy")
+                        .enabledIf(customScriptTemplateCheckBox.selected)
+                        .component
                 }
             }
         }

@@ -30,6 +30,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.asSafely
@@ -38,8 +39,10 @@ import org.jetbrains.plugins.groovy.debugger.fragments.GroovyCodeFragment
 import org.jetbrains.plugins.groovy.lang.psi.GroovyFile
 import org.jetbrains.plugins.groovy.lang.psi.GroovyPsiElementFactory
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrReferenceExpression
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
-import java.util.Base64
+import java.util.stream.Collectors
 import javax.swing.Icon
 
 abstract class AbstractGroovyExecuteAction(controlText: String, controlDescription: String, controlIcon: Icon, private val commitMode: Boolean) : AbstractExecuteAction(
@@ -93,12 +96,8 @@ abstract class AbstractGroovyExecuteAction(controlText: String, controlDescripti
         val settings = DeveloperSettingsComponent.getInstance(project).state
 
         if (!settings.groovySettings.disableScriptTemplate) {
-
-            // REVIEWME
-            val hacConnectionSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
             val hacClient = HybrisHacHttpClient.getInstance(project)
-            processedContent = hacClient.applyScriptTemplate(processedContent, hacConnectionSettings.hacSpringWebContext ?: "default")
-
+            processedContent = hacClient.applyScriptTemplate(project,processedContent)
         }
 
         processedContent = "/* ${psiFile.name} */\n$processedContent"

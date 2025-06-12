@@ -1,7 +1,6 @@
 /*
  * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2014-2016 Alexander Bartash <AlexanderBartash@gmail.com>
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -16,34 +15,25 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package com.intellij.idea.plugin.hybris.groovy.actions
 
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.groovy.GroovyHACService
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.diagnostic.Logger
 
-class GroovyGenerateDynamicPropertiesAction: AnAction(
-    "Generate Dynamic Properties",
+class GroovyTestAction : AnAction(
+    "Start Background Task",
     null,
     HybrisIcons.SPRING_BEAN
 ) {
-
-    override fun actionPerformed(e: AnActionEvent) {
-
-        LOG.info("started")
-
-        // REVIEWME: for now we are registering all beans all together
-
-        val project = e.project ?: return
-        val service = GroovyHACService.getInstance(project)
-        service.loadBeanDefinitions(e)
-
-    }
-
-    companion object {
-        private val LOG = Logger.getInstance(GroovyGenerateDynamicPropertiesAction::class.java)
+    override fun actionPerformed(event: AnActionEvent) {
+        val project = event.project
+        if (project != null) {
+            val service = GroovyHACService.getInstance(project)
+            service.loadBeanDefinitions(event)
+        }
     }
 
 }

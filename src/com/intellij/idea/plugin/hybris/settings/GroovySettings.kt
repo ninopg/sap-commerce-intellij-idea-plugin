@@ -23,4 +23,6 @@ data class GroovySettings(
     var enableActionsToolbarForGroovyTest: Boolean = false,
     var enableActionsToolbarForGroovyIdeConsole: Boolean = false,
     var disableScriptTemplate: Boolean = false,
-    )
+    var useCustomScriptTemplate: Boolean = false,
+    var customScriptTemplatePath: String = "",
+)

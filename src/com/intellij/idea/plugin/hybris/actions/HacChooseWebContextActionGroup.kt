@@ -20,6 +20,7 @@ package com.intellij.idea.plugin.hybris.actions
 
 import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
+import com.intellij.idea.plugin.hybris.groovy.GroovyHACService
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
@@ -97,22 +98,8 @@ class ReloadWebContextAction(private val parent: GroovyChooseWebContextActionGro
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val hacClient = HybrisHacHttpClient.getInstance(project)
-
-        // REVIEWME this is also duplicated in AbstractGroovyExecuteAction.kt
-        // This can be also moved in hacClient
-        val baseScript = "springWeb.keySet().join('|')"
-
-        // val templateStream = javaClass.getResourceAsStream("/ghac/scriptTemplate.groovy")
-        // val template = templateStream?.bufferedReader()?.use { it.readText() } ?: ""
-        // val script = template
-        //     .replace("\$hacEncodedScript", String(Base64.getEncoder().encode(baseScript.toByteArray(StandardCharsets.UTF_8)), StandardCharsets.UTF_8))
-        //    .replace("\$hacSpringWebContext", "default")
-
-        val response = hacClient.executeGroovyScript(project,baseScript, false, 10_000, "default")
-        parent.webContexts.clear()
-        parent.webContexts.add("default")
-        parent.webContexts.addAll(response.result.split("|").filter { it.isNotBlank() }.sorted())
+        val service = GroovyHACService.getInstance(project)
+        service.loadWebContexts(e, parent.webContexts)
     }
 
 }
