@@ -113,14 +113,90 @@ def dumpSpringContext(String domain ,String contextId ,ApplicationContext ctx, b
 
 }
 
+def dumpSpringContext(ApplicationContext ctx, boolean  dumpBeans) {
+
+    def _ctx = ctx
+    def root = true
+
+    while (_ctx != null) {
+
+        def key = contextQualifier(_ctx)
+
+        def contextProps = {ApplicationContext it ->
+            [
+                contextId: key,
+                id: it.id,
+                applicationName: it.applicationName,
+                displayName: it.displayName,
+                type: it.class.name,
+                isRoot: !_ctx.parent
+            ]
+        } as Closure<Map<String,?>>
+
+        def context = contextProps(_ctx)
+        _ctx.parent?.with {context.parent = contextProps(it)}
+
+        resp[key] = context
+
+        def bf = _ctx.beanFactory as DefaultListableBeanFactory
+        def beanDefinitions = bf.beanDefinitionNames.collectEntries { [(it): bf.getBeanDefinition(it)] } as Map<String, BeanDefinition>
+
+        context.beanDefinitions = []
+
+        def searchType = {BeanDefinition bd ->
+            while (bd) {
+                if (bd.beanClassName) return bd.beanClassName
+                bd = bd.parentName && bf.containsBeanDefinition(bd.parentName) ? bf.getBeanDefinition(bd.parentName) : null
+            }
+            return null
+        }
+
+        if (dumpBeans) {
+
+            beanDefinitions.sort{it.key}.eachWithIndex { k, v, ix ->
+
+                def beanDefinition = [
+                        name: k,
+                        beanDefinitionType: v.getClass().name,
+                        type: searchType(v),
+                        abstract: v.isAbstract(),
+                        parent: v.parentName,
+                        scope: v.scope,
+                        singleton: v.isSingleton(),
+                        prototype: v.isPrototype(),
+                        path: v.resourceDescription
+                ] as Map<String,?>
+
+                def beanAliases = _ctx.getAliases(k)
+                if (beanAliases) {
+                    beanDefinition.aliases = beanAliases
+                }
+
+                context.beanDefinitions << beanDefinition
+                context.aliases = FieldUtils.readField(bf, 'aliasMap', true)
+
+            }
+
+        }
+
+        _ctx = _ctx.parent
+        root = false
+
+    }
+
+}
+
 try {
 
-    springWeb.each { k, v -> dumpSpringContext('web', k, v, dumpBeans, true)}
-    dumpSpringContext('application', 'core', Registry.coreApplicationContext, dumpBeans, false)
+    // springWeb.each { k, v -> dumpSpringContext('web', k, v, dumpBeans, true)}
+    // dumpSpringContext('application', 'core', Registry.coreApplicationContext, dumpBeans, false)
+
+    dumpSpringContext(spring, false)
 
 } catch (any) {
     println "${any}\n  ${any.stackTrace.join('\n  ')}"
     throw any
 }
 
-JsonOutput.prettyPrint(JsonOutput.toJson(resp))
+// JsonOutput.prettyPrint(JsonOutput.toJson(resp))
+resp

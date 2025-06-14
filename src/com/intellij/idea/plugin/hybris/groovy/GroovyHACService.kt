@@ -20,6 +20,9 @@ package com.intellij.idea.plugin.hybris.groovy
 
 import com.google.gson.Gson
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
+import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil.getActiveRemoteConnectionSettings
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -41,11 +44,13 @@ private const val GHAC_SPRING_BEANS_GROOVY = "/ghac/springBeans.groovy"
 @Service(Service.Level.PROJECT)
 class GroovyHACService(val project: Project, private val coroutineScope: CoroutineScope) {
 
+    private val groovySettings = DeveloperSettingsComponent.getInstance(project).state.groovySettings
+
     fun loadBeanDefinitions(event: AnActionEvent) {
         val project = event.project
         if (project != null) {
             coroutineScope.launch {
-                doloadBeanDefinitions(project)
+                doLoadBeanDefinitions(project)
             }
         }
     }
@@ -59,155 +64,150 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
         }
     }
 
-    private suspend fun doloadBeanDefinitions(project: Project) {
+    private suspend fun doLoadBeanDefinitions(project: Project) {
 
-        // val project = event.project
-        // if (project == null) return
+        var success = false
+        var resultMessage = "Task completed"
 
-        // coroutineScope.launch {
+        val windowManager = WindowManager.getInstance().getStatusBar(project)
+        val hacClient = HybrisHacHttpClient.getInstance(project)
 
-            var success = false
-            var resultMessage = "Task completed"
+        withBackgroundProgress(project, "Loading Spring bean definitions from hAC", cancellable = true) {
 
-            val windowManager = WindowManager.getInstance().getStatusBar(project)
-            val hacClient = HybrisHacHttpClient.getInstance(project)
+            try {
 
-            withBackgroundProgress(project, "Loading Spring bean definitions from hAC", cancellable = true) {
+                reportProgress(100) { progressReporter ->
 
-                try {
+                    val script = hacClient.getScriptAsResource(GHAC_SPRING_BEANS_GROOVY)
 
-                    reportProgress(100) { progressReporter ->
+                    if (script != null) {
 
-                        val script = hacClient.getScriptAsResource(GHAC_SPRING_BEANS_GROOVY)
+                        var beanCounter1 = 0
+                        var beanCounter2 = 0
 
-                        if (script != null) {
+                        try {
 
-                            var beanCounter1 = 0
-                            var beanCounter2 = 0
+                            val hacConnectionSettings = getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+                            val springWebContext = hacConnectionSettings.hacSpringWebContext ?: "default"
+                            val httpResponse = hacClient.executeGroovyScript(project, script, false, 30_000, springWebContext, HybrisHacHttpClient.GHAC_SCRIPT_TEMPLATE_GROOVY)
+                            if (httpResponse.hasError()) {
+                                success = false
+                                resultMessage = httpResponse.errorMessage
+                            } else if (httpResponse.result?.isBlank() ?: true) {
+                                success = false
+                                resultMessage = "Empty response from hac for script $GHAC_SPRING_BEANS_GROOVY"
+                            } else {
 
-                            try {
+                                val baseClass = "groovy.lang.Script"
+                                val gson = Gson()
+                                val json: Map<String, Any?> = gson.fromJson(httpResponse.result, Map::class.java) as Map<String, Any?>
 
-                                val httpResponse = hacClient.executeGroovyScript(project, script, false, 30_000, "default", HybrisHacHttpClient.GHAC_SCRIPT_TEMPLATE_GROOVY)
-                                if (httpResponse.hasError()) {
-                                    success = false
-                                    resultMessage = httpResponse.errorMessage
-                                } else if (httpResponse.result?.isBlank() ?: true) {
-                                    success = false
-                                    resultMessage = "Empty response from hac for script $GHAC_SPRING_BEANS_GROOVY"
-                                } else {
+                                val dynamicManager = DynamicManagerImpl.getInstance(project)
+                                val existingPropsMap = dynamicManager
+                                    .findDynamicPropertiesOfClass(baseClass).associateBy({ it.name }, { it.type })
 
-                                    val baseClass = "groovy.lang.Script"
-                                    val gson = Gson()
-                                    val json: Map<String, Any?> = gson.fromJson(httpResponse.result, Map::class.java) as Map<String, Any?>
+                                val totContexts = json.entries.size
+                                var currentContext = 1
 
-                                    val dynamicManager = DynamicManagerImpl.getInstance(project)
-                                    val existingPropsMap = dynamicManager
-                                        .findDynamicPropertiesOfClass(baseClass).associateBy({ it.name }, { it.type })
+                                for ((key, value) in json.entries) {
 
-                                    val totContexts = json.entries.size
-                                    var currentContext = 1
+                                    LOG.info("processing bean definitions for spring context $key")
 
-                                    for ((key, value) in json.entries) {
+                                    progressReporter.sizedStep(100 * currentContext / totContexts, "Processing bean definitions for spring context $key") {
 
-                                        LOG.info("processing bean definitions for spring context $key")
+                                        val context = json.get(key) as Map<String, Any?>
 
-                                        progressReporter.sizedStep(100 * currentContext / totContexts, "Processing bean definitions for spring context $key") {
+                                        val beansMap = (context.get("beanDefinitions") as List<Map<String, Any?>>).associateBy { it["name"] as? String }
 
-                                            val context = json.get(key) as Map<String, Any?>
-
-                                            val beansMap = (context.get("beanDefinitions") as List<Map<String, Any?>>).associateBy { it["name"] as? String }
-
-                                            for ((beanName, bean) in beansMap) {
-                                                if (skipBean(bean)) continue
-                                                val beanType = bean["type"] as? String ?: "java.lang.Object"
-                                                if (!existingPropsMap.containsKey(beanName)) {
-                                                    val prop = DynamicElementSettings()
-                                                    prop.containingClassName = baseClass
-                                                    prop.name = beanName
-                                                    prop.type = beanType
-                                                    prop.isMethod = false
-                                                    prop.isStatic = false
-                                                    dynamicManager.addProperty(prop)
-                                                    beanCounter1++
-                                                } else if (existingPropsMap.containsKey(beanName) && existingPropsMap.get(beanName) != beanType) {
-                                                    dynamicManager.replaceDynamicPropertyType(baseClass, beanName, existingPropsMap.get(beanName), beanType)
-                                                    beanCounter1++
-                                                }
-                                                beanCounter2++
+                                        for ((beanName, bean) in beansMap) {
+                                            val beanType = bean["type"] as? String ?: "java.lang.Object"
+                                            if (skipBean(bean)) continue
+                                            if (!existingPropsMap.containsKey(beanName)) {
+                                                val prop = DynamicElementSettings()
+                                                prop.containingClassName = baseClass
+                                                prop.name = beanName
+                                                prop.type = beanType
+                                                prop.isMethod = false
+                                                prop.isStatic = false
+                                                dynamicManager.addProperty(prop)
+                                                beanCounter1++
+                                            } else if (existingPropsMap.containsKey(beanName) && existingPropsMap.get(beanName) != beanType) {
+                                                dynamicManager.replaceDynamicPropertyType(baseClass, beanName, existingPropsMap.get(beanName), beanType)
+                                                beanCounter1++
                                             }
-
-                                            LOG.info("processing aliases for spring context ${key}")
-
-                                            val aliases = context.get("aliases") as Map<String, String>
-
-                                            for ((aliasName, beanName) in aliases) {
-                                                val targetBean = beansMap[aliasName] as Map<String, Any?>?
-                                                if (skipBean(targetBean)) continue
-                                                val beanType = targetBean!!["type"] as? String ?: "java.lang.Object"
-                                                if (!existingPropsMap.containsKey(beanName)) {
-                                                    val prop = DynamicElementSettings()
-                                                    prop.containingClassName = baseClass
-                                                    prop.name = aliasName
-                                                    prop.type = beanType
-                                                    prop.isMethod = false
-                                                    prop.isStatic = false
-                                                    dynamicManager.addProperty(prop)
-                                                    beanCounter1++
-                                                } else if (existingPropsMap.containsKey(aliasName) && existingPropsMap.get(aliasName) != beanType) {
-                                                    dynamicManager.replaceDynamicPropertyType(baseClass, aliasName, existingPropsMap.get(aliasName), beanType)
-                                                    beanCounter1++
-                                                }
-                                                beanCounter2++
-                                            }
-
+                                            beanCounter2++
                                         }
 
-                                        currentContext++
+                                        LOG.info("processing aliases for spring context ${key}")
+
+                                        val aliases = context.get("aliases") as Map<String, String>
+
+                                        for ((aliasName, beanName) in aliases) {
+                                            val targetBean = beansMap[aliasName] as Map<String, Any?>?
+                                            if (skipBean(targetBean)) continue
+                                            val beanType = targetBean!!["type"] as? String ?: "java.lang.Object"
+                                            if (!existingPropsMap.containsKey(beanName)) {
+                                                val prop = DynamicElementSettings()
+                                                prop.containingClassName = baseClass
+                                                prop.name = aliasName
+                                                prop.type = beanType
+                                                prop.isMethod = false
+                                                prop.isStatic = false
+                                                dynamicManager.addProperty(prop)
+                                                beanCounter1++
+                                            } else if (existingPropsMap.containsKey(aliasName) && existingPropsMap.get(aliasName) != beanType) {
+                                                dynamicManager.replaceDynamicPropertyType(baseClass, aliasName, existingPropsMap.get(aliasName), beanType)
+                                                beanCounter1++
+                                            }
+                                            beanCounter2++
+                                        }
 
                                     }
 
-                                    dynamicManager.fireChange()
-
-                                    LOG.info("done: updated/added: $beanCounter1, found: $beanCounter2")
-
-                                    success = true
-                                    resultMessage = "$beanCounter1/$beanCounter2 bean definitions registered/found."
+                                    currentContext++
 
                                 }
 
-                            } catch (e: Exception) {
-                                val errorMessage = "Error loading beans ${e.message}"
-                                success = false
-                                windowManager.info = errorMessage
-                                resultMessage = errorMessage
-                                LOG.error("Error loading beans", e)
+                                dynamicManager.fireChange()
+
+                                LOG.info("done: updated/added: $beanCounter1, found: $beanCounter2")
+
+                                success = true
+                                resultMessage = "$beanCounter1/$beanCounter2 bean definitions registered/found."
+
                             }
 
-                        } else {
-                            val errorMessage = "Script $GHAC_SPRING_BEANS_GROOVY not found"
+                        } catch (e: Exception) {
+                            val errorMessage = "Error loading beans ${e.message}"
                             success = false
                             windowManager.info = errorMessage
                             resultMessage = errorMessage
-                            LOG.error(errorMessage)
+                            LOG.error("Error loading beans", e)
                         }
 
+                    } else {
+                        val errorMessage = "Script $GHAC_SPRING_BEANS_GROOVY not found"
+                        success = false
+                        windowManager.info = errorMessage
+                        resultMessage = errorMessage
+                        LOG.error(errorMessage)
                     }
 
-                } catch (e: ProcessCanceledException) {
-                    success = false
-                    resultMessage = "Task canceled"
-                    throw e
-                } catch (e: Exception) {
-                    success = false
-                    resultMessage = "Task failed: ${e.message}"
-                    throw RuntimeException(e)
-                } finally {
-                    showNotification(project, "Spring Beans Definitions", resultMessage, success)
                 }
 
+            } catch (e: ProcessCanceledException) {
+                success = false
+                resultMessage = "Task canceled"
+                throw e
+            } catch (e: Exception) {
+                success = false
+                resultMessage = "Task failed: ${e.message}"
+                throw RuntimeException(e)
+            } finally {
+                showNotification(project, "Spring Beans Definitions", resultMessage, success)
             }
 
-        // }
+        }
 
     }
 
@@ -224,45 +224,42 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
     private fun skipBean(bean: Map<String, Any?>?): Boolean {
         if (bean == null) return  true
         if (bean["name"] == null) return true
-        if (bean["abstract"].let{ it == true }) return true
-        // if (bean["scope"] != "singleton") return true
-        if (bean["prototype"].let{ it == true }) return true
+        if (groovySettings.hacBeansExclusionList.any { (bean["type"] as String).startsWith(it) }) return true
+        if (bean["abstract"] == true) return true
+        if (bean["prototype"] == true) return true
         return false
     }
 
     private suspend fun doLoadWebContexts(project: Project, webContexts: MutableList<String>) {
-        // val project = event.project
-        // if (project == null) return
 
         var success = false
         var resultMessage = "Task completed"
 
-        // coroutineScope.launch {
-            // val windowManager = WindowManager.getInstance().getStatusBar(project)
-            reportProgress(1) { progressReporter ->
-                progressReporter.sizedStep(1, "Loading Spring Web Contexts...") {
-                    try {
-                        val hacClient = HybrisHacHttpClient.getInstance(project)
-                        val baseScript = "springWeb.keySet().join('|')"
-                        val response = hacClient.executeGroovyScript(project, baseScript, false, 10_000, "default", HybrisHacHttpClient.GHAC_SCRIPT_TEMPLATE_GROOVY)
-                        if (response.hasError()) {
-                            resultMessage = response.errorMessage
-                            success = false
-                        } else {
-                            webContexts.clear()
-                            webContexts.add("default")
-                            webContexts.addAll(response.result.split("|").filter { it.isNotBlank() }.sorted())
-                            success = true
-                        }
-                    } catch (e: Exception) {
+        // val windowManager = WindowManager.getInstance().getStatusBar(project)
+        reportProgress(1) { progressReporter ->
+            progressReporter.sizedStep(1, "Loading Spring Web Contexts...") {
+                try {
+                    val hacClient = HybrisHacHttpClient.getInstance(project)
+                    val baseScript = "springWeb.keySet().join('|')"
+                    val response = hacClient.executeGroovyScript(project, baseScript, false, 10_000, "default", HybrisHacHttpClient.GHAC_SCRIPT_TEMPLATE_GROOVY)
+                    if (response.hasError()) {
+                        resultMessage = response.errorMessage
                         success = false
-                        resultMessage = "Task failed: ${e.message}"
-                    } finally {
-                        showNotification(project, "Spring Web Contexts", resultMessage, success)
+                    } else {
+                        webContexts.clear()
+                        webContexts.add("default")
+                        webContexts.addAll(response.result.split("|").filter { it.isNotBlank() }.sorted())
+                        success = true
                     }
+                } catch (e: Exception) {
+                    success = false
+                    resultMessage = "Task failed: ${e.message}"
+                } finally {
+                    showNotification(project, "Spring Web Contexts", resultMessage, success)
                 }
             }
-        // }
+        }
+
     }
 
     companion object {

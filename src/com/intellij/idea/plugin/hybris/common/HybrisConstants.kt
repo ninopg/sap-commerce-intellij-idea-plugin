@@ -430,6 +430,15 @@ object HybrisConstants {
         "common/temp/node_modules"
     )
 
+    val DEFAULT_EXCLUSIONS_FOR_HAC_BEANS = listOf(
+        "de.hybris.platform.spring.config.ListMergeDirective",
+        "de.hybris.platform.spring.config.MapMergeDirective",
+        "de.hybris.platform.converters.impl.ModifyPopulatorList",
+        "de.hybris.platform.servicelayer.interceptor.impl.InterceptorMapping",
+        "org.springframework.context.",
+        "org.springframework.aop."
+    )
+
     const val KOTLIN_SRC_DIRECTORY = "kotlinsrc"
     private const val SRC_DIRECTORY = "src"
     private const val GROOVY_SRC_DIRECTORY = "groovysrc"

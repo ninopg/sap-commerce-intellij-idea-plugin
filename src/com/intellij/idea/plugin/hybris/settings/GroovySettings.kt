@@ -18,6 +18,8 @@
 
 package com.intellij.idea.plugin.hybris.settings
 
+import com.intellij.idea.plugin.hybris.common.HybrisConstants
+
 data class GroovySettings(
     var enableActionsToolbar: Boolean = true,
     var enableActionsToolbarForGroovyTest: Boolean = false,
@@ -25,4 +27,5 @@ data class GroovySettings(
     var disableScriptTemplate: Boolean = false,
     var useCustomScriptTemplate: Boolean = false,
     var customScriptTemplatePath: String = "",
-)
+    var hacBeansExclusionList: List<String> = HybrisConstants.DEFAULT_EXCLUSIONS_FOR_HAC_BEANS,
+    )
