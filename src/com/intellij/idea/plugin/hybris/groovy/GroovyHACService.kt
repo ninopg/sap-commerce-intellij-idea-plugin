@@ -19,6 +19,7 @@
 package com.intellij.idea.plugin.hybris.groovy
 
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
@@ -40,6 +41,40 @@ import org.jetbrains.plugins.groovy.annotator.intentions.dynamic.DynamicManagerI
 import org.jetbrains.plugins.groovy.annotator.intentions.dynamic.ui.DynamicElementSettings
 
 private const val GHAC_SPRING_BEANS_GROOVY = "/ghac/springBeans.groovy"
+
+data class WebApplicationContext(
+    val contextId: String,
+    val id: String,
+    val applicationName: String,
+    val displayName: String,
+    val type: String,
+    val isRoot: Boolean,
+    val parent: ParentContext?,
+    val beanDefinitions: List<BeanDefinition>?,
+    val aliases: Map<String,String>?
+)
+
+data class ParentContext(
+    val contextId: String,
+    val id: String,
+    val applicationName: String,
+    val displayName: String,
+    val type: String,
+    val isRoot: Boolean
+)
+
+data class BeanDefinition(
+    val name: String,
+    val beanDefinitionType: String,
+    val type: String?,
+    val abstract: Boolean,
+    val parent: String?,
+    val scope: String?,
+    val singleton: Boolean,
+    val prototype: Boolean,
+    val path: String,
+    val aliases: List<String>?
+)
 
 @Service(Service.Level.PROJECT)
 class GroovyHACService(val project: Project, private val coroutineScope: CoroutineScope) {
@@ -100,67 +135,78 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
 
                                 val baseClass = "groovy.lang.Script"
                                 val gson = Gson()
-                                val json: Map<String, Any?> = gson.fromJson(httpResponse.result, Map::class.java) as Map<String, Any?>
+                                val type = object : TypeToken<Map<String, WebApplicationContext>>() {}.type
+                                val contextMap: Map<String, WebApplicationContext> = gson.fromJson(httpResponse.result, type)
 
                                 val dynamicManager = DynamicManagerImpl.getInstance(project)
                                 val existingPropsMap = dynamicManager
                                     .findDynamicPropertiesOfClass(baseClass).associateBy({ it.name }, { it.type })
 
-                                val totContexts = json.entries.size
+                                val totContexts = contextMap.size
                                 var currentContext = 1
 
-                                for ((key, value) in json.entries) {
+                                for ((key, context) in contextMap.entries) {
 
                                     LOG.info("processing bean definitions for spring context $key")
 
                                     progressReporter.sizedStep(100 * currentContext / totContexts, "Processing bean definitions for spring context $key") {
 
-                                        val context = json.get(key) as Map<String, Any?>
+                                        val beansMap = (context.beanDefinitions)?.associateBy { it.name } ?: emptyMap()
 
-                                        val beansMap = (context.get("beanDefinitions") as List<Map<String, Any?>>).associateBy { it["name"] as? String }
-
-                                        for ((beanName, bean) in beansMap) {
-                                            val beanType = bean["type"] as? String ?: "java.lang.Object"
+                                        for (bean in beansMap.values) {
                                             if (skipBean(bean)) continue
-                                            if (!existingPropsMap.containsKey(beanName)) {
-                                                val prop = DynamicElementSettings()
-                                                prop.containingClassName = baseClass
-                                                prop.name = beanName
-                                                prop.type = beanType
-                                                prop.isMethod = false
-                                                prop.isStatic = false
-                                                dynamicManager.addProperty(prop)
-                                                beanCounter1++
-                                            } else if (existingPropsMap.containsKey(beanName) && existingPropsMap.get(beanName) != beanType) {
-                                                dynamicManager.replaceDynamicPropertyType(baseClass, beanName, existingPropsMap.get(beanName), beanType)
-                                                beanCounter1++
+
+                                            val beanNames : List<String> =
+                                                if (!bean.aliases.isNullOrEmpty() && groovySettings.onlyRegisterAliases)
+                                                    bean.aliases
+                                                else
+                                                    listOf(bean.name) + (bean.aliases ?: emptyList())
+
+                                            for (beanName in beanNames) {
+                                                if (!existingPropsMap.containsKey(beanName)) {
+                                                    val prop = DynamicElementSettings()
+                                                    prop.containingClassName = baseClass
+                                                    prop.name = beanName
+                                                    prop.type = bean.type
+                                                    prop.isMethod = false
+                                                    prop.isStatic = false
+                                                    dynamicManager.addProperty(prop)
+                                                    beanCounter1++
+                                                } else if (existingPropsMap.containsKey(beanName) && existingPropsMap.get(beanName) != bean.type) {
+                                                    dynamicManager.replaceDynamicPropertyType(baseClass, beanName, existingPropsMap.get(beanName), bean.type)
+                                                    beanCounter1++
+                                                }
                                             }
                                             beanCounter2++
                                         }
 
-                                        LOG.info("processing aliases for spring context ${key}")
+                                        /*
+                                        LOG.info("processing aliases for spring context $key")
 
-                                        val aliases = context.get("aliases") as Map<String, String>
-
-                                        for ((aliasName, beanName) in aliases) {
-                                            val targetBean = beansMap[aliasName] as Map<String, Any?>?
-                                            if (skipBean(targetBean)) continue
-                                            val beanType = targetBean!!["type"] as? String ?: "java.lang.Object"
-                                            if (!existingPropsMap.containsKey(beanName)) {
-                                                val prop = DynamicElementSettings()
-                                                prop.containingClassName = baseClass
-                                                prop.name = aliasName
-                                                prop.type = beanType
-                                                prop.isMethod = false
-                                                prop.isStatic = false
-                                                dynamicManager.addProperty(prop)
-                                                beanCounter1++
-                                            } else if (existingPropsMap.containsKey(aliasName) && existingPropsMap.get(aliasName) != beanType) {
-                                                dynamicManager.replaceDynamicPropertyType(baseClass, aliasName, existingPropsMap.get(aliasName), beanType)
-                                                beanCounter1++
+                                        for ((aliasName, beanName) in context.aliases ?: emptyMap()) {
+                                            val targetBean = beansMap[beanName]
+                                            if (targetBean != null) {
+                                                if (skipBean(targetBean)) continue
+                                                val beanType = targetBean.type ?: "java.lang.Object"
+                                                if (!existingPropsMap.containsKey(beanName)) {
+                                                    val prop = DynamicElementSettings()
+                                                    prop.containingClassName = baseClass
+                                                    prop.name = aliasName
+                                                    prop.type = beanType
+                                                    prop.isMethod = false
+                                                    prop.isStatic = false
+                                                    dynamicManager.addProperty(prop)
+                                                    beanCounter1++
+                                                } else if (existingPropsMap.containsKey(aliasName) && existingPropsMap.get(aliasName) != beanType) {
+                                                    dynamicManager.replaceDynamicPropertyType(baseClass, aliasName, existingPropsMap.get(aliasName), beanType)
+                                                    beanCounter1++
+                                                }
+                                            } else {
+                                                LOG.error("$aliasName in referencing invalid $beanName")
                                             }
                                             beanCounter2++
                                         }
+                                        */
 
                                     }
 
@@ -221,12 +267,11 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
             .notify(project)
     }
 
-    private fun skipBean(bean: Map<String, Any?>?): Boolean {
-        if (bean == null) return  true
-        if (bean["name"] == null) return true
-        if (groovySettings.hacBeansExclusionList.any { (bean["type"] as String).startsWith(it) }) return true
-        if (bean["abstract"] == true) return true
-        if (bean["prototype"] == true) return true
+    private fun skipBean(bd: BeanDefinition): Boolean {
+        if (groovySettings.hacBeansExclusionList.any { bd.type != null && bd.type.startsWith(it) }) return true
+        if (bd.abstract) return true
+        if (bd.prototype) return true
+        // if (bd.aliases != null && bd.aliases.isNotEmpty()) return true
         return false
     }
 
@@ -248,7 +293,10 @@ class GroovyHACService(val project: Project, private val coroutineScope: Corouti
                     } else {
                         webContexts.clear()
                         webContexts.add("default")
-                        webContexts.addAll(response.result.split("|").filter { it.isNotBlank() }.sorted())
+                        val contexts = response.result.split("|").filter { it.isNotBlank() }.sorted()
+                        webContexts.addAll(contexts)
+                        val settings = getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
+                        resultMessage = "Found ${contexts.size} contexts for ${settings.hostIP}"
                         success = true
                     }
                 } catch (e: Exception) {

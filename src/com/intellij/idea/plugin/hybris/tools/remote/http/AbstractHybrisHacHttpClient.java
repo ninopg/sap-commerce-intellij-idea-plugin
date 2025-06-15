@@ -98,52 +98,70 @@ public abstract class AbstractHybrisHacHttpClient {
     private final Map<RemoteConnectionSettings, Map<String, String>> cookiesPerSettings = new WeakHashMap<>();
 
     public String login(@NotNull final Project project, @NotNull final RemoteConnectionSettings settings) {
+
         final var hostHacURL = settings.getGeneratedURL();
-        retrieveCookies(hostHacURL, project, settings);
-
         final var cookieName = getCookieName(settings);
-        final var sessionId = Optional.ofNullable(cookiesPerSettings.get(settings))
-            .map(it -> it.get(cookieName))
-            .orElse(null);
-        if (sessionId == null) {
-            return "Unable to obtain sessionId for " + hostHacURL;
-        }
-
-        if (StringUtils.isNotBlank(settings.getReplicaId()) && !cookiesPerSettings.get(settings).get(ROUTE_COOKIE_NAME).equals('.' + settings.getReplicaId())) {
-            return String.format("Unable to find podId %s for %s", settings.getReplicaId(), hostHacURL);
-        }
-
-        final var csrfToken = getCsrfToken(hostHacURL, settings);
-        final var params = List.of(
-            new BasicNameValuePair("j_username", settings.getUsername()),
-            new BasicNameValuePair("j_password", settings.getPassword()),
-            new BasicNameValuePair("_csrf", csrfToken)
-        );
         final var loginURL = hostHacURL + "/j_spring_security_check";
-        final HttpResponse response = post(project, loginURL, params, false, DEFAULT_HAC_TIMEOUT, settings);
+
+        if (!settings.getUseSessionCookie()) {
+
+            final var params = List.of(new BasicNameValuePair("j_password", settings.getPassword()));
+            final HttpResponse response = post(project, loginURL, params, false, DEFAULT_HAC_TIMEOUT, settings);
+            return checkResponse(response);
+
+        } else {
+
+            retrieveCookies(hostHacURL, project, settings);
+
+            final var sessionId = Optional.ofNullable(cookiesPerSettings.get(settings))
+                .map(it -> it.get(cookieName))
+                .orElse(null);
+            if (sessionId == null) {
+                return "Unable to obtain sessionId for " + hostHacURL;
+            }
+
+            if (StringUtils.isNotBlank(settings.getReplicaId()) && !cookiesPerSettings.get(settings).get(ROUTE_COOKIE_NAME).equals('.' + settings.getReplicaId())) {
+                return String.format("Unable to find podId %s for %s", settings.getReplicaId(), hostHacURL);
+            }
+
+            final var csrfToken = getCsrfToken(hostHacURL, settings);
+            final var params = List.of(
+                new BasicNameValuePair("j_username", settings.getUsername()),
+                new BasicNameValuePair("j_password", settings.getPassword()),
+                new BasicNameValuePair("_csrf", csrfToken)
+            );
+            final HttpResponse response = post(project, loginURL, params, false, DEFAULT_HAC_TIMEOUT, settings);
+            final var loginResponse = checkResponse(response);
+            if (!loginResponse.equals(StringUtils.EMPTY)) return loginResponse;
+            final var newSessionId = CookieParser.getInstance().getSpecialCookie(response.getAllHeaders());
+            if (newSessionId != null) {
+                Optional.ofNullable(cookiesPerSettings.get(settings))
+                    .ifPresent(cookies -> cookies.put(cookieName, newSessionId));
+                return StringUtils.EMPTY;
+            }
+            final int statusCode = response.getStatusLine().getStatusCode();
+            final StringBuilder sb = new StringBuilder();
+            sb.append("HTTP ");
+            sb.append(statusCode);
+            sb.append(' ');
+            switch (statusCode) {
+                case HTTP_OK -> sb.append("Unable to obtain sessionId from response");
+                case HTTP_MOVED_TEMP -> sb.append(response.getFirstHeader("Location"));
+                default -> sb.append(response.getStatusLine().getReasonPhrase());
+            }
+            return sb.toString();
+        }
+
+    }
+
+    private String checkResponse(final HttpResponse response) {
         if (response.getStatusLine().getStatusCode() == HttpStatus.SC_MOVED_TEMPORARILY) {
             final Header location = response.getFirstHeader("Location");
             if (location != null && location.getValue().contains("login_error")) {
                 return "Wrong username/password. Set your credentials in [y] tool window.";
             }
         }
-        final var newSessionId = CookieParser.getInstance().getSpecialCookie(response.getAllHeaders());
-        if (newSessionId != null) {
-            Optional.ofNullable(cookiesPerSettings.get(settings))
-                .ifPresent(cookies -> cookies.put(cookieName, newSessionId));
-            return StringUtils.EMPTY;
-        }
-        final int statusCode = response.getStatusLine().getStatusCode();
-        final StringBuilder sb = new StringBuilder();
-        sb.append("HTTP ");
-        sb.append(statusCode);
-        sb.append(' ');
-        switch (statusCode) {
-            case HTTP_OK -> sb.append("Unable to obtain sessionId from response");
-            case HTTP_MOVED_TEMP -> sb.append(response.getFirstHeader("Location"));
-            default -> sb.append(response.getStatusLine().getReasonPhrase());
-        }
-        return sb.toString();
+        return StringUtils.EMPTY;
     }
 
     @NotNull
@@ -155,44 +173,55 @@ public abstract class AbstractHybrisHacHttpClient {
         final long timeout,
         final RemoteConnectionSettings settings
     ) {
-        final String cookieName = getCookieName(settings);
-        var cookies = cookiesPerSettings.get(settings);
-        if (cookies == null || !cookies.containsKey(cookieName)) {
-            final String errorMessage = login(project, settings);
-            if (StringUtils.isNotBlank(errorMessage)) {
-                return createErrorResponse(errorMessage);
-            }
-        }
-        cookies = cookiesPerSettings.get(settings);
-        final var sessionId = cookies.get(cookieName);
-        final var csrfToken = getCsrfToken(settings.getGeneratedURL(), settings);
-        if (csrfToken == null) {
-            cookiesPerSettings.remove(settings);
 
-            if (canReLoginIfNeeded) {
-                return post(project, actionUrl, params, false, timeout, settings);
+        final var post = new HttpPost(actionUrl);
+
+        final String cookieName = getCookieName(settings);
+
+        if (!settings.getUseSessionCookie()) {
+            post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + settings.getPassword());
+        } else {
+            var cookies = cookiesPerSettings.get(settings);
+            if (cookies == null || !cookies.containsKey(cookieName)) {
+                final String errorMessage = login(project, settings);
+                if (StringUtils.isNotBlank(errorMessage)) {
+                    return createErrorResponse(errorMessage);
+                }
             }
-            return createErrorResponse("Unable to obtain csrfToken for sessionId=" + sessionId);
+            cookies = cookiesPerSettings.get(settings);
+            final var sessionId = cookies.get(cookieName);
+            final var csrfToken = getCsrfToken(settings.getGeneratedURL(), settings);
+            if (csrfToken == null) {
+                cookiesPerSettings.remove(settings);
+
+                if (canReLoginIfNeeded) {
+                    return post(project, actionUrl, params, false, timeout, settings);
+                }
+                return createErrorResponse("Unable to obtain csrfToken for sessionId=" + sessionId);
+            }
+
+            final var cookie = cookies.entrySet().stream()
+                .map(it -> it.getKey() + '=' + it.getValue())
+                .collect(Collectors.joining("; "));
+
+            post.setHeader("User-Agent", HttpHeaders.USER_AGENT);
+            post.setHeader("X-CSRF-TOKEN", csrfToken);
+            post.setHeader("Cookie", cookie);
+            post.setHeader("Accept", "application/json");
+            post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            post.setHeader("Sec-Fetch-Dest", "empty");
+            post.setHeader("Sec-Fetch-Mode", "cors");
+            post.setHeader("Sec-Fetch-Site", "same-origin");
+
         }
+
+        LOG.info("POST request: " + post);
+
         // REVIEWME: client is created for each request
         final var client = createAllowAllClient(timeout);
         if (client == null) {
             return createErrorResponse("Unable to create HttpClient");
         }
-        final var post = new HttpPost(actionUrl);
-        final var cookie = cookies.entrySet().stream()
-            .map(it -> it.getKey() + '=' + it.getValue())
-            .collect(Collectors.joining("; "));
-        post.setHeader("User-Agent", HttpHeaders.USER_AGENT);
-        post.setHeader("X-CSRF-TOKEN", csrfToken);
-        post.setHeader("Cookie", cookie);
-        post.setHeader("Accept", "application/json");
-        post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        post.setHeader("Sec-Fetch-Dest", "empty");
-        post.setHeader("Sec-Fetch-Mode", "cors");
-        post.setHeader("Sec-Fetch-Site", "same-origin");
-
-        LOG.info("POST request: " + post);
 
         final HttpResponse response;
         try {

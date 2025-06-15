@@ -20,25 +20,29 @@ package com.intellij.idea.plugin.hybris.groovy.actions
 
 import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
 
-class ToggleScriptTemplateAction : ToggleAction(
-"Script Template",
-"Enable/disable script template",
-    AllIcons.Actions.Minimap) {
+class ToggleScriptTemplateAction : ToggleAction(null, null, AllIcons.Actions.Minimap) {
 
     override fun isSelected(e: AnActionEvent): Boolean {
         val project = e.project ?: return false
         val groovySettings = DeveloperSettingsComponent.getInstance(project).state.groovySettings
-        return groovySettings.disableScriptTemplate
+        e.presentation.text = if (groovySettings.disableScriptTemplate) "Enable Script Template" else "Disable Script Template"
+        // e.presentation.description = groovySettings.disableScriptTemplate.toString()
+        return !groovySettings.disableScriptTemplate
     }
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
         val project = e.project ?: return
         val groovySettings = DeveloperSettingsComponent.getInstance(project).state.groovySettings
-        groovySettings.disableScriptTemplate = !isSelected(e)
+        // I should remove web context selector from toolbar
+        // val actionManager = ActionManager.getInstance()
+        // val action = actionManager.getAction("hybris.groovy.select.web.context")
+        // action.templatePresentation.isVisible = !state
+        groovySettings.disableScriptTemplate = !state
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT

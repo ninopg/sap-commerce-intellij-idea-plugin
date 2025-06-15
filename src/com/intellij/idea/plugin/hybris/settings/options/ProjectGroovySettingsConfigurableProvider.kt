@@ -22,12 +22,9 @@ import com.intellij.idea.plugin.hybris.common.HybrisConstants
 import com.intellij.idea.plugin.hybris.common.equalsIgnoreOrder
 import com.intellij.idea.plugin.hybris.common.utils.HybrisI18NBundleUtils.message
 import com.intellij.idea.plugin.hybris.groovy.file.GroovyFileToolbarInstaller
-import com.intellij.idea.plugin.hybris.settings.components.ApplicationSettingsComponent
 import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.settings.components.ProjectSettingsComponent
 import com.intellij.idea.plugin.hybris.ui.CRUDListPanel
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
-import com.intellij.openapi.observable.util.bind
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.options.ConfigurableProvider
 import com.intellij.openapi.project.Project
@@ -35,8 +32,6 @@ import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
-import com.intellij.ui.dsl.builder.toNonNullableProperty
-import com.intellij.ui.dsl.builder.toNullableProperty
 import com.intellij.ui.layout.and
 import com.intellij.ui.layout.not
 import com.intellij.ui.layout.selected
@@ -54,11 +49,12 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
         private val developerSettings = DeveloperSettingsComponent.getInstance(project).state.groovySettings
 
         private lateinit var enableActionToolbar: JCheckBox
-        private lateinit var disableScriptCheckBox: JCheckBox
+        private lateinit var disableScriptTemplateCheckBox: JCheckBox
         private lateinit var customScriptTemplateCheckBox: JCheckBox
+        private lateinit var onlyRegisterAliasesCheckBox: JCheckBox
 
         override fun createPanel() = panel {
-            group("Language") {
+            group("Toolbar") {
                 row {
                     enableActionToolbar = checkBox("Enable actions toolbar for each Groovy file")
                         .bindSelected(developerSettings::enableActionsToolbar)
@@ -80,8 +76,10 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
                         .enabledIf(enableActionToolbar.selected)
                         .onApply { GroovyFileToolbarInstaller.getInstance()?.toggleToolbarForAllEditors(project) }
                 }
+            }
+            group ("Execution") {
                 row {
-                    disableScriptCheckBox = checkBox("Disable script template")
+                    disableScriptTemplateCheckBox = checkBox("Disable script template")
                         .bindSelected(developerSettings::disableScriptTemplate)
                         .comment("Disable script template for execution of Groovy scripts in hAC Groovy console.")
                         .enabledIf(enableActionToolbar.selected)
@@ -90,13 +88,19 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
                 }
                 row {
                     customScriptTemplateCheckBox = checkBox("Use a custom script template:")
-                            .bindSelected(developerSettings::useCustomScriptTemplate)
-                            .component
+                        .bindSelected(developerSettings::useCustomScriptTemplate)
+                        .component
                     textFieldWithBrowseButton("Select Groovy Script Template")
                         .align(AlignX.FILL)
                         .bindText(developerSettings::customScriptTemplatePath)
                         .comment("Default script template ghac/scriptTemplate.groovy")
-                        .enabledIf(customScriptTemplateCheckBox.selected.and(disableScriptCheckBox.selected.not()))
+                        .enabledIf(customScriptTemplateCheckBox.selected.and(disableScriptTemplateCheckBox.selected.not()))
+                        .component
+                }
+                row {
+                    onlyRegisterAliasesCheckBox = checkBox("Skip bean definition when alias is defined")
+                        .bindSelected(developerSettings::onlyRegisterAliases)
+                        .comment("For bean with aliases only the aliases are registered as Dynamic Properties")
                         .component
                 }
                 row {

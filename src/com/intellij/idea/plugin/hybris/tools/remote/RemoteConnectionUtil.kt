@@ -81,8 +81,8 @@ object RemoteConnectionUtil {
             it.type = type
             when (type) {
                 RemoteConnectionType.Hybris -> {
-                    it.port = getPropertyOrDefault(project, HybrisConstants.PROPERTY_TOMCAT_SSL_PORT, "9002")
-                    it.hacWebroot = getPropertyOrDefault(project, HybrisConstants.PROPERTY_HAC_WEBROOT, "")
+                    it.port = getPropertyOrDefault(project, HybrisConstants.PROPERTY_TOMCAT_SSL_PORT, "")
+                    it.hacWebroot = getPropertyOrDefault(project, HybrisConstants.PROPERTY_HAC_WEBROOT, "/hac")
                     it.sslProtocol = HybrisConstants.DEFAULT_SSL_PROTOCOL
                     it.credentials = Credentials(
                         "admin",

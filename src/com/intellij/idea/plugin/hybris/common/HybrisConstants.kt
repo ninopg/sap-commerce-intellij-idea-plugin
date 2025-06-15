@@ -435,6 +435,13 @@ object HybrisConstants {
         "de.hybris.platform.spring.config.MapMergeDirective",
         "de.hybris.platform.converters.impl.ModifyPopulatorList",
         "de.hybris.platform.servicelayer.interceptor.impl.InterceptorMapping",
+        "de.hybris.platform.commercefacades.xstream.alias.",
+        // "de.hybris.platform.commercefacades.xstream.alias.TypeAliasMapping",
+        // "de.hybris.platform.commercefacades.xstream.alias.ImplicitCollection",
+        // "de.hybris.platform.commercefacades.xstream.alias.FieldAliasMapping",
+        // "de.hybris.platform.commercefacades.xstream.alias.ImplicitCollection",
+        // "de.hybris.platform.commercefacades.xstream.conv.AttributeConverterMapping",
+        "de.hybris.platform.cmsfacades.types.service.impl.DefaultComponentTypeAttributeStructure",
         "org.springframework.context.",
         "org.springframework.aop."
     )

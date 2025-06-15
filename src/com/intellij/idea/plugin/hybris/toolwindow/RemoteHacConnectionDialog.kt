@@ -39,21 +39,20 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.EnumComboBoxModel
 import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.ui.components.JBLoadingPanel
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.ComboBoxPredicate
 import com.intellij.ui.layout.selected
 import org.jetbrains.annotations.NotNull
-import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JComboBox
 
 
 class ReloadEnvironmentsAction(val subscriptionComboBox: JComboBox<CCv2Subscription>, val dialog: RemoteHacConnectionDialog) :
     AnAction(
-        "Reload Environments",
+        "Reload environments",
         "Reloads environments for the selected) subscription",
         AllIcons.General.Refresh) {
     override fun actionPerformed(e: AnActionEvent) {
@@ -106,6 +105,7 @@ class RemoteHacConnectionDialog(
 ) {
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
+    private lateinit var useSessionCookieCheckBox: JBCheckBox
     private lateinit var sessionCookieNameTextField: JBTextField
 
     override fun createTestSettings() = with(RemoteConnectionSettings()) {
@@ -113,6 +113,7 @@ class RemoteHacConnectionDialog(
         hostIP = hostEditableComboBox.selectedItem?.toString()
         port = portTextField.text
         isSsl = sslProtocolCheckBox.isSelected
+        useSessionCookie = useSessionCookieCheckBox.isSelected
         isWsl = isWslCheckBox?.isSelected ?: false
         sslProtocol = sslProtocolComboBox.selectedItem?.toString() ?: ""
         hacWebroot = webrootTextField.text
@@ -294,10 +295,10 @@ class RemoteHacConnectionDialog(
                     ),
                     renderer = SimpleListCellRenderer.create("?") { it }
                 )
-                    .enabledIf(sslProtocolCheckBox.selected)
-                    .bindItem(settings::sslProtocol.toNullableProperty())
-                    .align(AlignX.FILL)
-                    .component
+                .enabledIf(sslProtocolCheckBox.selected)
+                .bindItem(settings::sslProtocol.toNullableProperty())
+                .align(AlignX.FILL)
+                .component
             }.layout(RowLayout.PARENT_GRID)
 
             row {
@@ -310,12 +311,13 @@ class RemoteHacConnectionDialog(
             }.layout(RowLayout.PARENT_GRID)
 
             row {
-                label("Session Cookie Name:")
+                useSessionCookieCheckBox = checkBox("Session cookie name:").bindSelected(settings::useSessionCookie).component
                 sessionCookieNameTextField = textField()
                     .comment("Optional: override the session cookie name. Default is JSESSIONID.")
                     .align(AlignX.FILL)
                     .bindText(settings::sessionCookieName.toNonNullableProperty(HybrisConstants.DEFAULT_SESSION_COOKIE_NAME))
-                    .apply { component.text = "" }
+                    .enabledIf(useSessionCookieCheckBox.selected)
+                    //.apply { component.text = "" }
                     .component
             }.layout(RowLayout.PARENT_GRID)
 
@@ -325,7 +327,7 @@ class RemoteHacConnectionDialog(
                     replicaIdsComboBoxModel,
                     renderer = SimpleListCellRenderer.create("") { it }
                 )
-                .comment("Optional: Target a specific replica.")
+                .comment("Optional: target a specific replica.")
                 .align(AlignX.FILL)
                 .bindItem(
                     getter = { ->
@@ -353,7 +355,7 @@ class RemoteHacConnectionDialog(
                     //.widthGroup("credentials")
                     .enabled(false)
                     .addValidationRule("Username cannot be blank.") { it.text.isNullOrBlank() }
-                    .component
+                    .component.apply { columns = 32 }
             }.layout(RowLayout.PARENT_GRID)
 
             row {
@@ -363,7 +365,7 @@ class RemoteHacConnectionDialog(
                     .align(AlignX.FILL)
                     .enabled(false)
                     .addValidationRule("Password cannot be blank.") { it.password.isEmpty() }
-                    .component
+                    .component.apply { columns = 32 }
                 actionButton(ShowPasswordAction(passwordTextField))
             }.layout(RowLayout.PARENT_GRID)
         }

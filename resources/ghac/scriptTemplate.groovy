@@ -1,16 +1,12 @@
 package ghac
 
 import com.sun.management.ThreadMXBean
-import de.hybris.platform.core.model.ItemModel
-import de.hybris.platform.jalo.GenericItem
 import de.hybris.platform.scripting.engine.ScriptExecutionResult
 import de.hybris.platform.scripting.engine.content.impl.SimpleScriptContent
 import de.hybris.platform.scripting.engine.exception.ScriptExecutionException
 import de.hybris.platform.scripting.engine.impl.PrecompiledExecutable
-import groovy.json.DefaultJsonGenerator
-import groovy.json.JsonGenerator
+import groovy.json.JsonOutput
 import org.apache.catalina.startup.Bootstrap
-import org.apache.groovy.json.internal.CharBuf
 import org.springframework.web.context.WebApplicationContext
 import org.springframework.web.context.support.WebApplicationContextUtils
 import org.springframework.web.servlet.FrameworkServlet
@@ -21,7 +17,6 @@ import java.nio.charset.StandardCharsets
 
 import static de.hybris.platform.hac.scripting.impl.DefaultScriptingLanguageExecutor.*
 
-// REVIEWME: check wirh root context = ''
 static Map<String,WebApplicationContext> getSpringWeb() {
     Map<String,WebApplicationContext> map = [:]
     def server = Bootstrap.daemon.catalinaDaemon.server
@@ -44,94 +39,15 @@ static Map<String,WebApplicationContext> getSpringWeb() {
                         if (mvcServletWrappers.size() > 1) {
                             springContextKey = [attributeName - FrameworkServlet.SERVLET_CONTEXT_PREFIX]
                         }
-                        // println "context: ${(contextKey + springContextKey).join('/')} -> ${context.servletContext.getAttribute(attributeName)}"
                         map << [('/' + (contextKey + springContextKey).join('/')):context.servletContext.getAttribute(attributeName)]
                     }
                 } else if (rootWebContext) {
-                    //println "context: ${contextKey.join('/')} -> ${rootWebContext}"
                     map << [('/' + contextKey.join('/')):rootWebContext]
                 }
             }
         }
     }
     map
-}
-
-String toString(obj) {
-
-    if (obj == null) {
-        'null'
-    } else if (obj instanceof ItemModel) {
-        "${obj.itemtype}(${typeService.getUniqueAttributes(obj.itemtype).collect{"${it}:${toString(modelService.getAttributeValue(obj,it))}"}.join(':')})"
-    } else if (obj instanceof GenericItem) {
-        toString(modelService.get(obj))
-    } else if (obj instanceof Collection) {
-        obj.collect{toString(it)}?.toString()
-    } else {
-        obj?.toString()
-    }
-
-}
-
-static String abbreviate(String s, maxLength = 500) {
-    if (!s) return s
-    s.length() > maxLength ? s.take(maxLength) + '...' : s
-}
-
-def toStringConverter = {it -> toString(it)}
-def abbreviatedToStringConverter = {it -> abbreviate(toString(toString(it)))}
-
-def jsonGeneratorOptions = new JsonGenerator.Options()
-        // java
-        .addConverter(java.lang.Class, {it.name})
-        .addConverter(org.springframework.beans.factory.BeanFactory, abbreviatedToStringConverter)
-        .addConverter(org.springframework.context.ApplicationContext, abbreviatedToStringConverter)
-        // aop
-        .addConverter(org.springframework.aop.Advisor, toStringConverter)
-        .addConverter(org.springframework.aop.TargetSource, toStringConverter)
-        .addConverter(org.springframework.cglib.proxy.Callback, toStringConverter)
-        // hybris
-        .addConverter(de.hybris.platform.core.Tenant, {it.toString()})
-        .addConverter(de.hybris.platform.servicelayer.internal.service.AbstractService, toStringConverter)
-        .addConverter(de.hybris.platform.core.model.ItemModel, toStringConverter)
-        .addConverter(de.hybris.platform.servicelayer.internal.converter.ModelConverter, toStringConverter)
-        // exclude nulls
-        .excludeNulls()
-
-def jsonGenerator = new DefaultJsonGenerator(jsonGeneratorOptions) {
-
-    Set<Object> visitedObjects = new HashSet<>()
-
-    Integer depth = 0
-
-    Integer maxDepth = 4
-
-    @Override
-    protected void writeObject(String key, Object object, CharBuf buffer) {
-
-        // println "${depth} ${key} ${object?.getClass()?.name} ${visitedObjects.size()}"
-
-        depth++
-
-        if (depth > maxDepth || visitedObjects.contains(object)) {
-            super.writeObject(key, object?.toString(), buffer)
-        } else {
-            visitedObjects.add(object)
-            super.writeObject(key, object, buffer)
-            visitedObjects.remove(object)
-        }
-
-        depth--
-
-    }
-
-}
-
-def mapObject = {obj ->
-    if (!obj) return ''
-    if (obj instanceof String) return obj
-    if (obj instanceof Number) return obj
-    return jsonGenerator.toJson(obj)
 }
 
 def threadMXBean = ManagementFactory.threadMXBean
@@ -148,10 +64,8 @@ try {
     def outputPrintStream = new PrintStream(outputStream, true, 'UTF-8')
     def outputWriter = new PrintWriter(outputPrintStream)
 
-    // this adds binding variable 'out'
     def globalContext = scriptingLanguagesExecutor.prepareScriptContext(outputPrintStream)
 
-    // REVIEWME lazy logic here
     def springWeb = getSpringWeb()
     globalContext['springWeb'] = springWeb
 
@@ -217,17 +131,13 @@ try {
         }
     }
 
-    // configure json serialization (ex: serialization for models)
-
-    // result[OUTPUT_TEXT_KEY] = scriptingLanguagesExecutor.stringifyOutStream(outputStream)
     result[OUTPUT_TEXT_KEY] = outputStream.toString('UTF-8')
     result[STACKTRACE_TEXT_KEY] = stackTraceText ?: stackTraceWriter.toString()
-    result[EXECUTION_RESULT_KEY] = scriptExecutionResult?.scriptResult?.toString() // mapObject(scriptExecutionResult?.scriptResult)
-    return mapObject(result)
+    result[EXECUTION_RESULT_KEY] = scriptExecutionResult?.scriptResult?.toString()
+    return JsonOutput.toJson(result)
 
 } catch (Throwable t) {
 
-    // result[OUTPUT_TEXT_KEY] = scriptingLanguagesExecutor.stringifyOutStream(outputStream)
     result[EXECUTION_RESULT_KEY] = ''
     result[OUTPUT_TEXT_KEY] = outputStream.toString('UTF-8')
 

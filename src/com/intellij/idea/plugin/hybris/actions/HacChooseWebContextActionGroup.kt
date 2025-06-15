@@ -21,6 +21,7 @@ package com.intellij.idea.plugin.hybris.actions
 import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
 import com.intellij.idea.plugin.hybris.groovy.GroovyHACService
+import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComponent
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
@@ -67,6 +68,15 @@ class GroovyChooseWebContextActionGroup : DefaultActionGroup({ "Choose Spring We
     override fun update(e: AnActionEvent) {
         val project = e.project ?: return
         val presentation = e.presentation
+
+        val groovySettings = DeveloperSettingsComponent.getInstance(project).state.groovySettings
+        if (groovySettings.disableScriptTemplate) {
+            presentation.isVisible = false
+            return
+        } else {
+            presentation.isVisible = true
+        }
+
         presentation.text = this.currentAction?.actionName ?: "Select Spring Web Context"
         this.currentAction?.icon?.let {  presentation.icon = it }
         presentation.isEnabledAndVisible = true

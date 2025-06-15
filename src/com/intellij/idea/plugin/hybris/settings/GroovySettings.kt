@@ -19,6 +19,7 @@
 package com.intellij.idea.plugin.hybris.settings
 
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import org.apache.solr.common.cloud.Aliases
 
 data class GroovySettings(
     var enableActionsToolbar: Boolean = true,
@@ -28,4 +29,5 @@ data class GroovySettings(
     var useCustomScriptTemplate: Boolean = false,
     var customScriptTemplatePath: String = "",
     var hacBeansExclusionList: List<String> = HybrisConstants.DEFAULT_EXCLUSIONS_FOR_HAC_BEANS,
+    var onlyRegisterAliases: Boolean = true
     )
