@@ -97,6 +97,8 @@ class ProjectGroovySettingsConfigurableProvider(val project: Project) : Configur
                         .enabledIf(customScriptTemplateCheckBox.selected.and(disableScriptTemplateCheckBox.selected.not()))
                         .component
                 }
+            }
+            group ("Bean Registration") {
                 row {
                     onlyRegisterAliasesCheckBox = checkBox("Skip bean definition when alias is defined")
                         .bindSelected(developerSettings::onlyRegisterAliases)

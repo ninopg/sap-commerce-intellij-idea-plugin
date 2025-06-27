@@ -106,7 +106,7 @@ def dumpSpringContext(ApplicationContext ctx, boolean  dumpBeans) {
 
 try {
 
-    dumpSpringContext(spring.parent.parent, true)
+    dumpSpringContext(spring, true)
 
 } catch (any) {
     println "${any}\n  ${any.stackTrace.join('\n  ')}"
