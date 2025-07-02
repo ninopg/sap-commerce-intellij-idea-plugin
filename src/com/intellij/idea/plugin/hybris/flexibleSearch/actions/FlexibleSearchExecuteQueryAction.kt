@@ -20,11 +20,17 @@ package com.intellij.idea.plugin.hybris.flexibleSearch.actions
 
 import com.intellij.idea.plugin.hybris.actions.AbstractExecuteAction
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import com.intellij.idea.plugin.hybris.common.HybrisConstants.KEY_FLEXIBLE_SEARCH_PARAMETERS
 import com.intellij.idea.plugin.hybris.common.utils.HybrisI18NBundleUtils.message
 import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
+import com.intellij.idea.plugin.hybris.flexibleSearch.editor.FlexibleSearchSplitEditor
 import com.intellij.idea.plugin.hybris.flexibleSearch.file.FlexibleSearchFileType
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.Project
+import com.intellij.util.asSafely
 
 class FlexibleSearchExecuteQueryAction : AbstractExecuteAction(
     FlexibleSearchFileType.defaultExtension,
@@ -32,7 +38,7 @@ class FlexibleSearchExecuteQueryAction : AbstractExecuteAction(
 ) {
 
     init {
-        with (templatePresentation) {
+        with(templatePresentation) {
             text = message("hybris.fxs.actions.execute_query")
             description = message("hybris.fxs.actions.execute_query.description")
             icon = HybrisIcons.Console.Actions.EXECUTE
@@ -45,4 +51,24 @@ class FlexibleSearchExecuteQueryAction : AbstractExecuteAction(
         val enabled = file != null && file.name.endsWith(".$extension")
         e.presentation.isEnabledAndVisible = enabled
     }
+
+    override fun processContent(e: AnActionEvent, content: String, editor: Editor, project: Project): String = FileEditorManager.getInstance(project)
+        .getSelectedEditor(editor.virtualFile)
+        .asSafely<FlexibleSearchSplitEditor>()
+        ?.getUserData(KEY_FLEXIBLE_SEARCH_PARAMETERS)
+        ?.sortedByDescending { it.name.length }
+        ?.let { properties ->
+            var updatedContent = content
+            properties.forEach {
+                updatedContent = updatedContent.replace("?${it.name}", it.value)
+            }
+//todo replace by regex
+//                updatedContent.replace("\\?(\\w+)".toRegex()) { matchResult ->
+//                    val key = matchResult.groupValues[1]
+//                    replacements[key] ?: matchResult.value
+//                }
+//
+            return@let updatedContent
+        }
+        ?: content
 }
