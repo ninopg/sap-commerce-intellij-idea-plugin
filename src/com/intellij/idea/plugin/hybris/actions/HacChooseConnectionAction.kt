@@ -1,6 +1,6 @@
 /*
  * This file is part of "SAP Commerce Developers Toolset" plugin for IntelliJ IDEA.
- * Copyright (C) 2019-2024 EPAM Systems <hybrisideaplugin@epam.com> and contributors
+ * Copyright (C) 2019-2025 EPAM Systems <hybrisideaplugin@epam.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -22,6 +22,7 @@ import com.intellij.idea.plugin.hybris.settings.options.ProjectIntegrationsSetti
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionType
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionUtil
 import com.intellij.idea.plugin.hybris.toolwindow.RemoteHacConnectionDialog
+import com.intellij.idea.plugin.hybris.ui.ActionButtonWithTextAndDescription
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -37,6 +38,7 @@ class HacChooseConnectionAction : DefaultActionGroup() {
     init {
         templatePresentation.icon = HybrisIcons.Y.REMOTE
         templatePresentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
+        templatePresentation.putClientProperty(ActionUtil.COMPONENT_PROVIDER, ActionButtonWithTextAndDescription(this))
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -54,8 +56,13 @@ class HacChooseConnectionAction : DefaultActionGroup() {
                     override fun actionPerformed(e: AnActionEvent) = RemoteConnectionUtil.setActiveRemoteConnectionSettings(project, it)
                 }
             }
+        val replicas = listOf(ActionManager.getInstance().getAction("hybris.hac.configureReplica"))
 
-        return actions + Separator.create("Available Connections") + connectionActions
+        return actions +
+            Separator.create("Available Connections") +
+            connectionActions +
+            Separator.create("Replicas") +
+            replicas
     }
 
     override fun update(e: AnActionEvent) {
@@ -63,8 +70,14 @@ class HacChooseConnectionAction : DefaultActionGroup() {
         val presentation = e.presentation
 
         val hacSettings = RemoteConnectionUtil.getActiveRemoteConnectionSettings(project, RemoteConnectionType.Hybris)
-        presentation.text = if (e.place == ActionPlaces.EDITOR_TOOLBAR) hacSettings.toString()
-        else hacSettings.shortenConnectionName()
+        presentation.text = when (e.place) {
+            ActionPlaces.EDITOR_TOOLBAR -> hacSettings.toString()
+            HybrisActionPlaces.CONSOLE_TOOLBAR -> null
+            else -> hacSettings.shortenConnectionName()
+        }
+        if (e.place == HybrisActionPlaces.CONSOLE_TOOLBAR) {
+            presentation.putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
+        }
         presentation.isEnabledAndVisible = true
 
         presentation.description = createHTML().div {
