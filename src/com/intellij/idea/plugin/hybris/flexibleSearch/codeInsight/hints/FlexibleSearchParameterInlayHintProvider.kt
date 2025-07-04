@@ -39,7 +39,7 @@ class FlexibleSearchParameterInlayHintProvider : InlayHintsProvider {
                     .getSelectedEditor(element.containingFile.virtualFile)
                     .asSafely<FlexibleSearchSplitEditor>()
                     ?.getParameters()
-                    ?.find { it.name == element.text.removePrefix("?") && it.presentationValue.isNotBlank() }
+                    ?.find { it.name == element.value && it.presentationValue.isNotBlank() }
                     ?.let {
                         sink.addPresentation(
                             position = InlineInlayPosition(element.textRange.endOffset, true),
