@@ -26,8 +26,12 @@ import com.intellij.idea.plugin.hybris.settings.components.DeveloperSettingsComp
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsoleService
 import com.intellij.idea.plugin.hybris.tools.remote.console.impl.HybrisGroovyConsole
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.Project
 import com.intellij.util.asSafely
 import org.jetbrains.plugins.groovy.GroovyFileType
+import org.jetbrains.plugins.groovy.lang.psi.GroovyFile
 
 class GroovyExecuteAction : AbstractExecuteAction(
     GroovyFileType.GROOVY_FILE_TYPE.defaultExtension,
@@ -67,5 +71,41 @@ class GroovyExecuteAction : AbstractExecuteAction(
                 e.presentation.text = "Execute Groovy Script<br/>Commit Mode <strong><font color='#57965C'>ON</font></strong>"
             }
         }
+    }
+
+    override fun processContent(
+        e: AnActionEvent,
+        content: String,
+        editor: Editor,
+        project: Project
+    ): String {
+        val psiFile = CommonDataKeys.PSI_FILE.getData(e.dataContext) ?: return content
+
+        val selectionModel = editor.selectionModel
+
+        var processedContent = content
+
+        if (selectionModel.hasSelection() && psiFile is GroovyFile && !psiFile.importStatements.isEmpty()) {
+
+            val document = editor.document
+            val selectionStartLine = document.getLineNumber(selectionModel.selectionStart)
+            val selectionEndLine = document.getLineNumber(selectionModel.selectionEnd)
+
+            val missingImports = psiFile.importStatements.filter { import ->
+                val importLine = document.getLineNumber(import.textOffset)
+                importLine < selectionStartLine || importLine > selectionEndLine
+            }
+
+            if (!missingImports.isEmpty()) {
+                val importStatements = missingImports.map { it.text }
+                val importBlock = importStatements.joinToString(separator = "\n")
+                processedContent = "$importBlock\n\n$processedContent"
+            }
+
+        }
+
+        processedContent = "/* ${psiFile.name} */\n$processedContent"
+
+        return processedContent
     }
 }

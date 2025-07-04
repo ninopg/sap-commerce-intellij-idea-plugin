@@ -36,6 +36,7 @@
 
 ### `Groovy` enhancements
 - Adjusted execution mode selection `commit`/`rollback` [#1422](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1422)
+- Add Groovy imports when a block of lines is selected in the editor for execution [#1436](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1436)
 
 ### `Other` enhancements
 - Added possibility to select Replica for HAC connection [#1423](https://github.com/epam/sap-commerce-intellij-idea-plugin/pull/1423)
