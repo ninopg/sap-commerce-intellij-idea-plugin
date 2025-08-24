@@ -23,6 +23,8 @@ import com.intellij.credentialStore.Credentials
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.ide.passwordSafe.PasswordSafe
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModel
+import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionService
 import com.intellij.idea.plugin.hybris.tools.remote.settings.state.RemoteConnectionSettingsState
 import com.intellij.openapi.application.ModalityState
@@ -36,6 +38,7 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
+import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
@@ -54,7 +57,11 @@ abstract class AbstractRemoteConnectionDialog(
     protected val project: Project,
     parentComponent: Component,
     protected val settings: RemoteConnectionSettingsState,
-    dialogTitle: String
+    dialogTitle: String,
+    // REVIEWMW
+    protected val subscriptionsComboBoxModel: CCv2SubscriptionsComboBoxModel = CCv2SubscriptionsComboBoxModelFactory.create(project, allowBlank = true),
+    protected val environmentsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
+    protected val hostsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>()
 ) : DialogWrapper(project, parentComponent, false, IdeModalityType.IDE) {
 
     private val originalScope = settings.scope

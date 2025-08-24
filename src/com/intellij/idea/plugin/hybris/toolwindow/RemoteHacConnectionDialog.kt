@@ -19,7 +19,14 @@
 package com.intellij.idea.plugin.hybris.toolwindow
 
 import com.intellij.credentialStore.Credentials
+import com.intellij.database.util.common.isNotNullOrEmpty
+import com.intellij.icons.AllIcons
 import com.intellij.idea.plugin.hybris.common.HybrisConstants
+import com.intellij.idea.plugin.hybris.common.utils.HybrisIcons
+import com.intellij.idea.plugin.hybris.tools.ccv2.CCv2Service
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentStatus
+import com.intellij.idea.plugin.hybris.tools.ccv2.settings.state.CCv2Subscription
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionScope
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.idea.plugin.hybris.tools.remote.settings.RemoteConnectionListener
@@ -30,14 +37,23 @@ import com.intellij.ui.EnumComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
+import com.intellij.ui.layout.ComboBoxPredicate
 import com.intellij.ui.layout.selected
 import java.awt.Component
+import java.util.*
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import javax.swing.JComboBox
 
 class RemoteHacConnectionDialog(
     project: Project,
     parentComponent: Component,
     settings: RemoteConnectionSettingsState
 ) : AbstractRemoteConnectionDialog(project, parentComponent, settings, "Remote SAP Commerce Instance") {
+
+    protected lateinit var subscriptionComboBox: JComboBox<CCv2Subscription>
+    protected lateinit var environmentComboBox: JComboBox<String>
+    protected lateinit var serviceComboBox: JComboBox<String>
 
     private lateinit var sslProtocolComboBox: ComboBox<String>
     private lateinit var sessionCookieNameTextField: JBTextField
@@ -65,6 +81,7 @@ class RemoteHacConnectionDialog(
         .testConnection(testSettings)
 
     override fun panel() = panel {
+
         row {
             label("Connection name:")
                 .bold()
@@ -82,6 +99,98 @@ class RemoteHacConnectionDialog(
                 renderer = SimpleListCellRenderer.create("?") { it.title }
             )
                 .bindItem(settings::scope.toNullableProperty(RemoteConnectionScope.PROJECT_PERSONAL))
+        }.layout(RowLayout.PARENT_GRID)
+
+        row {
+            label("Subscription:").comment("Optional: Select a subscription to use for this connection.")
+            subscriptionComboBox = comboBox(
+                subscriptionsComboBoxModel,
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (value != null) {
+                        label.icon = HybrisIcons.Module.CCV2
+                        label.text = value.toString()
+                    } else {
+                        label.text = ""
+                    }
+                }
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(
+                 getter = { ->
+                     (0 until subscriptionsComboBoxModel.size ).asSequence()
+                         .map { subscriptionsComboBoxModel.getElementAt(it)}
+                         .firstOrNull { it?.uuid == settings.subscription }
+                 },
+                 setter = { selected -> settings.subscription = selected?.uuid }
+            )
+            .onChanged {
+                // FIXME
+                environmentsComboBoxModel.removeAll()
+                updateEnvironmentsComboBox()
+                // updatePortTextField()
+                // updateCredentials()
+            }.component
+            // FIXME
+            // actionButton(ReloadEnvironmentsAction(subscriptionComboBox, this@RemoteHacConnectionDialog)).enabledIf(
+            //     ComboBoxPredicate(subscriptionComboBox, { it != null })
+            // )
+        }.layout(RowLayout.PARENT_GRID)
+
+        if (settings.subscription != null) {
+            val semaphore = Semaphore(0)
+            updateEnvironmentsComboBox(semaphore)
+            val received = semaphore.tryAcquire(30, TimeUnit.SECONDS)
+            if (!received && settings.environment.isNotNullOrEmpty) {
+                environmentsComboBoxModel.add(settings.environment)
+            }
+        }
+
+        row {
+            label("Environment:").comment("Optional: Select an environment to use for this connection.")
+            environmentComboBox = comboBox(
+                environmentsComboBoxModel,
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (subscriptionComboBox.selectedItem != null && value != null) {
+                        label.icon = HybrisIcons.Extension.CLOUD
+                        // label.text = "${subscriptionComboBox.selectedItem}.${value}"
+                        label.text = value
+                    } else {
+                        label.text = ""
+                    }
+                }
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(settings::environment.toNullableProperty(defaultValue = ""))
+            .enabledIf(ComboBoxPredicate(subscriptionComboBox, { it != null }))
+            .onChanged {
+                // updateHostsComboBox()
+                // updateReplicaIdsComboBox()
+                // updateCredentials()
+            }
+            .component
+        }.layout(RowLayout.PARENT_GRID)
+
+        row {
+            label("Service:").comment("Optional: Select a service to use for this connection.")
+            serviceComboBox = comboBox(
+                listOf("") + commerceServices,
+                renderer = SimpleListCellRenderer.create { label, value, _ ->
+                    if (value?.isNotBlank() ?: false) {
+                        label.icon = AllIcons.Nodes.Services
+                        label.text = value
+                    } else {
+                        label.text = ""
+                    }
+                }
+            )
+            .widthGroup("topComboBoxes")
+            .bindItem(settings::service.toNullableProperty(defaultValue = ""))
+            .enabledIf(ComboBoxPredicate(environmentComboBox, { it.isNotNullOrEmpty }))
+            .onChanged {
+                // updateHostsComboBox()
+                // updateReplicaIdsComboBox()
+            }
+            .component
         }.layout(RowLayout.PARENT_GRID)
 
         group("Full URL Preview", false) {
@@ -191,4 +300,45 @@ class RemoteHacConnectionDialog(
             }.layout(RowLayout.PARENT_GRID)
         }
     }
+
+    fun updateEnvironmentsComboBox(semaphore : Semaphore? = null) {
+        if (subscriptionComboBox.selectedItem != null) {
+            val subscription = subscriptionComboBox.selectedItem as CCv2Subscription
+            environmentComboBox.isEnabled = false
+            CCv2Service.getInstance(project).fetchEnvironments(
+                listOf(subscription),
+                { result : SortedMap<CCv2Subscription, Collection<CCv2EnvironmentDto>> ->
+                    println(result)
+                    // diableOtherComboBoxes(subscriptionComboBox)
+                    result[subscription]?.let {
+                        val environments = with(Regex("""([dsp])(\d+)""")) {
+                            it.map { it.code }
+                                .sortedWith(compareBy(
+                                    { code -> if (matchEntire(code) != null) 0 else 1 },
+                                    { code -> matchEntire(code)?.groupValues?.get(1)?.let { when (it) { "d" -> 0; "s" -> 1; "p" -> 2; else -> 3 } } ?: 3 },
+                                    { code -> matchEntire(code)?.groupValues?.get(2)?.toIntOrNull() ?: Int.MAX_VALUE },
+                                    { code -> code }
+                                ))
+                        }
+                        environmentsComboBoxModel.update(environments)
+                        environmentComboBox.isEnabled = true
+                        semaphore?.release()
+                    }
+                },
+                false,
+                EnumSet.of(CCv2EnvironmentStatus.AVAILABLE),
+                false,
+                false,
+                false
+            )
+        } else {
+            settings.environment = ""
+            environmentComboBox.selectedItem = ""
+        }
+    }
+
+    companion object {
+        val commerceServices = listOf("accstorefront", "api", "backoffice", "backgroundprocessing")
+    }
+
 }

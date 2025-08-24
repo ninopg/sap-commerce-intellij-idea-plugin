@@ -41,6 +41,11 @@ class RemoteConnectionSettingsState : BaseState(), Comparable<RemoteConnectionSe
     var credentials: Credentials? = null
     var displayName by string(null)
     var scope by property(RemoteConnectionScope.PROJECT_PERSONAL) { false }
+
+    var subscription by string(null)
+    var environment by string(null)
+    var service by string(null)
+
     var type by property(RemoteConnectionType.Hybris) { false }
     var hostIP by string(HybrisConstants.DEFAULT_HOST_URL)
     var port by string(null)
