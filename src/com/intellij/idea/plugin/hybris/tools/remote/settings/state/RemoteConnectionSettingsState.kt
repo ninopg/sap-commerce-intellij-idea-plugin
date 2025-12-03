@@ -42,9 +42,9 @@ class RemoteConnectionSettingsState : BaseState(), Comparable<RemoteConnectionSe
     var displayName by string(null)
     var scope by property(RemoteConnectionScope.PROJECT_PERSONAL) { false }
 
-    var subscription by string(null)
-    var environment by string(null)
-    var service by string(null)
+    var subscriptionUUID by string(null)
+    var environmentCode by string(null)
+    var serviceCode by string(null)
 
     var type by property(RemoteConnectionType.Hybris) { false }
     var hostIP by string(HybrisConstants.DEFAULT_HOST_URL)

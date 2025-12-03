@@ -23,6 +23,8 @@ import com.intellij.credentialStore.Credentials
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.ide.passwordSafe.PasswordSafe
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2EnvironmentDto
+import com.intellij.idea.plugin.hybris.tools.ccv2.dto.CCv2ServiceDto
 import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModel
 import com.intellij.idea.plugin.hybris.tools.ccv2.ui.CCv2SubscriptionsComboBoxModelFactory
 import com.intellij.idea.plugin.hybris.tools.remote.RemoteConnectionService
@@ -60,7 +62,8 @@ abstract class AbstractRemoteConnectionDialog(
     dialogTitle: String,
     // REVIEWMW
     protected val subscriptionsComboBoxModel: CCv2SubscriptionsComboBoxModel = CCv2SubscriptionsComboBoxModelFactory.create(project, allowBlank = true),
-    protected val environmentsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>(),
+    protected val environmentsComboBoxModel: MutableCollectionComboBoxModel<CCv2EnvironmentDto> = MutableCollectionComboBoxModel(),
+    protected val servicesComboBoxModel: MutableCollectionComboBoxModel<CCv2ServiceDto> = MutableCollectionComboBoxModel(),
     protected val hostsComboBoxModel: MutableCollectionComboBoxModel<String> = MutableCollectionComboBoxModel<String>()
 ) : DialogWrapper(project, parentComponent, false, IdeModalityType.IDE) {
 

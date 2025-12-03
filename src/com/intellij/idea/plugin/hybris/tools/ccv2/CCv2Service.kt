@@ -30,6 +30,7 @@ import com.intellij.idea.plugin.hybris.tools.ccv2.settings.options.ApplicationCC
 import com.intellij.idea.plugin.hybris.tools.ccv2.settings.state.CCv2Subscription
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -42,6 +43,8 @@ import com.intellij.openapi.util.getOrCreateUserDataUnsafe
 import com.intellij.openapi.util.removeUserData
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.WindowManager
+import com.intellij.openapi.wm.impl.status.StatusBarUtil
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.progress.ProgressReporter
 import com.intellij.platform.util.progress.reportProgress
@@ -99,6 +102,8 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
         val statuses = (statuses ?: ccv2Settings.showEnvironmentStatuses)
             .map { it.name }
 
+        val statusBar = WindowManager.getInstance().getStatusBar(project)
+
         coroutineScope.launch {
             withBackgroundProgress(project, "Fetching CCv2 Environments...", true) {
                 val environments = sortedMapOf<CCv2Subscription, Collection<CCv2EnvironmentDto>>()
@@ -110,8 +115,22 @@ class CCv2Service(val project: Project, private val coroutineScope: CoroutineSco
                                     val environments = (getCCv2Token(subscription)
                                         ?.let { ccv2Token ->
                                             try {
+                                                // log execution time and thread name
+
+                                                val startTime = System.currentTimeMillis()
+
                                                 val cachedEnvironments =
                                                     fetchCacheableEnvironments(progressReporter, ccv2Token, subscription, statuses, requestV1Details, requestV1Health)
+
+                                                val executionTime = System.currentTimeMillis() - startTime
+
+                                                val message = "Fetched ${cachedEnvironments.size} environments for ${subscription.name} in ${executionTime}ms on ${Thread.currentThread().name}"
+                                                // statusBar?.info = message
+                                                // StatusBarUtil.setStatusBarInfo(project, message)
+
+                                                ApplicationManager.getApplication().invokeLater {
+                                                    StatusBarUtil.setStatusBarInfo(project, message)
+                                                }
 
                                                 if (requestServices) {
                                                     cachedEnvironments
