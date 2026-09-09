@@ -21,13 +21,12 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.checkCanceled
-import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.getOrCreateUserDataUnsafe
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.application
 import com.intellij.util.asSafely
 import com.intellij.util.io.HttpRequests
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -46,86 +45,151 @@ import java.util.jar.JarFile
 @Service
 class LibraryRootLookupService {
 
-    suspend fun findJarUrls(lookupRepositories: List<String>, libraryJar: VirtualFile, libraryRootLookups: Collection<LibraryRootLookup>) {
+    suspend fun findJarUrls(
+        lookupCache: LibraryRootLookupCache,
+        lookupRepositories: List<String>,
+        libraryJar: VirtualFile,
+        libraryRootLookups: Collection<LibraryRootLookup>
+    ) {
         if (libraryRootLookups.isEmpty()) return
 
         checkCanceled()
 
-        val mavenArtifactCoords = libraryJar.getOrCreateUserDataUnsafe(KEY_MAVEN_COORDS) {
-            // most common approach -> maven packaging META-INF/maven
-            val localMavenCoords = readMavenCoordsFromArchive(libraryJar)
-            // example: accessors-smart-2.5.2.jar
-                ?: guessByBundleInManifestMF(libraryJar)
-                // example: activation-1.1.1.jar
-                ?: guessByExtensionNameInManifestMF(libraryJar)
+        val artifactKey = lookupCache.artifactKey(libraryJar.name, libraryJar.length)
+        val lookups = libraryRootLookups
+            .filterNot { lookupCache.isKnownAbsent(artifactKey, it.type) }
+            .takeIf { it.isNotEmpty() }
+            ?: return
+        val mavenArtifactCoords = findMavenArtifactCoords(lookupCache, lookupRepositories, libraryJar, artifactKey) ?: return
 
-            // cache it only if artifact exists in remote
-            localMavenCoords
-                ?.takeIf { remoteExists(lookupRepositories) { baseUrl -> localMavenCoords.toUrl(baseUrl) } != null }
-            // if nothing helps -> fallback to search by SHA1 of the respective jar file
-                ?: getExternalMavenCoords(libraryJar)
-                    ?.let { MavenArtifactCoords.from(it) }
-                    ?.takeIf { remoteExists(lookupRepositories) { baseUrl -> it.toUrl(baseUrl) } != null }
-        } ?: return
-
-        libraryRootLookups.forEach {
+        // sources and javadocs are resolved independently, an artifact may provide only one of them
+        lookups.forEach {
             checkCanceled()
 
-            val artifactSourceType = it.type
+            val remoteLookup = findRemote(lookupRepositories) { baseUrl -> mavenArtifactCoords.toUrl(baseUrl, it.type) }
 
-            it.url = libraryJar.getOrCreateUserDataUnsafe(artifactSourceType.key) {
-                remoteExists(lookupRepositories) { baseUrl -> mavenArtifactCoords.toUrl(baseUrl, artifactSourceType) }
-            }
+            it.url = remoteLookup.url
+
+            if (remoteLookup.absent) lookupCache.rememberAbsent(artifactKey, it.type)
         }
     }
+
+    private suspend fun findMavenArtifactCoords(
+        lookupCache: LibraryRootLookupCache,
+        lookupRepositories: List<String>,
+        libraryJar: VirtualFile,
+        artifactKey: String
+    ): MavenArtifactCoords? {
+        lookupCache.knownArtifactCoords(artifactKey)?.let { return it }
+
+        // most common approach -> maven packaging META-INF/maven
+        val localCoords = readMavenCoordsFromArchive(libraryJar)
+            // example: accessors-smart-2.5.2.jar
+            ?: guessByBundleInManifestMF(libraryJar)
+            // example: activation-1.1.1.jar
+            ?: guessByExtensionNameInManifestMF(libraryJar)
+        val mavenArtifactCoords = localCoords?.takeIf { availableInRemote(lookupRepositories, it) }
+            // if nothing helps -> fallback to search by SHA1 of the respective jar file
+            ?: findMavenArtifactCoordsBySha1(lookupRepositories, libraryJar)
+            ?: return null
+
+        // remember it only if the artifact exists in remote
+        lookupCache.rememberArtifactCoords(artifactKey, mavenArtifactCoords)
+
+        return mavenArtifactCoords
+    }
+
+    private suspend fun findMavenArtifactCoordsBySha1(lookupRepositories: List<String>, libraryJar: VirtualFile): MavenArtifactCoords? {
+        val solrCoords = getExternalMavenCoords(libraryJar) ?: return null
+        val mavenArtifactCoords = MavenArtifactCoords.from(solrCoords)
+
+        return mavenArtifactCoords.takeIf { availableInRemote(lookupRepositories, it) }
+    }
+
+    private suspend fun availableInRemote(lookupRepositories: List<String>, mavenArtifactCoords: MavenArtifactCoords) =
+        findRemote(lookupRepositories) { baseUrl -> mavenArtifactCoords.toUrl(baseUrl) }.url != null
 
     private suspend fun getExternalMavenCoords(libraryJar: VirtualFile): SolrMavenArtifactCoords? {
         checkCanceled()
 
-        val sha1 = libraryJar.toNioPath()
-            .takeIf { it.fileExists }
-            ?.toFile()
-            ?.sha1()
+        val sha1 = withContext(Dispatchers.IO) {
+            libraryJar.toNioPath()
+                .takeIf { it.fileExists }
+                ?.toFile()
+                ?.sha1()
+        }
             ?: return null
         val url = "https://central.sonatype.com/solrsearch/select?rows=1&wt=json&q=1:$sha1"
 
         try {
-            return HttpRequests.request(url)
-                .accept("application/json")
-                .connectTimeout(3000)
-                .readTimeout(3000)
-                .connect { processor ->
-                    JSON.decodeFromString<SolrResponse>(processor.readString()).response
-                        .docs
-                        .firstOrNull()
-                }
+            return withContext(Dispatchers.IO) {
+                HttpRequests.request(url)
+                    .accept("application/json")
+                    .connectTimeout(CONNECT_TIMEOUT)
+                    .readTimeout(READ_TIMEOUT)
+                    .connect { processor ->
+                        JSON.decodeFromString<SolrResponse>(processor.readString()).response
+                            .docs
+                            .firstOrNull()
+                    }
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             thisLogger().debug("Solr MavenCoords not found for: ${libraryJar.nameWithoutExtension}, $url, due: ${e.message}")
         }
         return null
     }
 
-    private suspend fun remoteExists(baseUrls: Collection<String>, urlProvider: (String) -> String): String? = baseUrls
-        .firstNotNullOfOrNull { baseUrl -> urlProvider(baseUrl).takeIf { remoteExists(it) } }
+    private suspend fun findRemote(baseUrls: Collection<String>, urlProvider: (String) -> String): RemoteLookup {
+        var absent = baseUrls.isNotEmpty()
 
-    private suspend fun remoteExists(url: String): Boolean {
+        baseUrls.forEach { baseUrl ->
+            val url = urlProvider(baseUrl)
+
+            when (remoteExists(url)) {
+                true -> return RemoteLookup(url = url)
+                false -> Unit
+                // availability stays unknown, so the outcome must not be remembered as absent
+                null -> absent = false
+            }
+        }
+
+        return RemoteLookup(absent = absent)
+    }
+
+    /**
+     * `true` - the artifact is available, `false` - the repository responded that the artifact does not exist,
+     * `null` - the repository cannot be reached, availability of the artifact stays unknown.
+     */
+    private suspend fun remoteExists(url: String): Boolean? {
         checkCanceled()
 
         try {
-            return HttpRequests.head(url)
-                .connectTimeout(3000)
-                .readTimeout(3000)
-                .connect { processor ->
-                    processor.connection
-                        .asSafely<HttpURLConnection>()
-                        ?.responseCode == HttpURLConnection.HTTP_OK
-                }
-                ?: false
+            return withContext(Dispatchers.IO) {
+                HttpRequests.head(url)
+                    .connectTimeout(CONNECT_TIMEOUT)
+                    .readTimeout(READ_TIMEOUT)
+                    .connect { processor ->
+                        processor.connection
+                            .asSafely<HttpURLConnection>()
+                            ?.responseCode == HttpURLConnection.HTTP_OK
+                    }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: HttpRequests.HttpStatusException) {
+            if (e.statusCode == HttpURLConnection.HTTP_NOT_FOUND) {
+                thisLogger().debug("Resource does not exist: $url")
+
+                return false
+            }
+            thisLogger().debug("Resource is not accessible: $url, due: ${e.message}")
         } catch (e: Exception) {
-            thisLogger().debug("Resource not found for: $url, due: ${e.message}")
+            thisLogger().debug("Repository is not reachable for: $url, due: ${e.message}")
         }
 
-        return false
+        return null
     }
 
     private suspend fun guessByBundleInManifestMF(libraryJar: VirtualFile) = readManifestMF(libraryJar) { attributes ->
@@ -198,6 +262,8 @@ class LibraryRootLookupService {
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             thisLogger().warn("no maven coordinates MF for ${libraryJar.name}, due: ${e.message}")
         }
@@ -218,10 +284,17 @@ class LibraryRootLookupService {
     }
 
     companion object {
+        private const val DELIMITER = "|"
+        private const val CONNECT_TIMEOUT = 3000
+        private const val READ_TIMEOUT = 3000
         private val REGEX_POM_PROPERTIES = "META-INF/maven.+/pom\\.properties".toRegex()
-        private val KEY_MAVEN_COORDS: Key<MavenArtifactCoords?> = Key.create<MavenArtifactCoords?>("sap.commerce.toolset.java.jarArtifactUrl")
         private val JSON = Json { ignoreUnknownKeys = true }
 
         fun getService(): LibraryRootLookupService = application.service()
     }
 }
+
+private data class RemoteLookup(
+    val url: String? = null,
+    val absent: Boolean = false,
+)
